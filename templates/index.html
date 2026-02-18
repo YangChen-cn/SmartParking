@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking & EV Charging System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+        .slot-card { transition: all 0.3s; border-radius: 15px; border-top: 5px solid transparent; }
+        .status-free { border-top-color: #198754; }
+        .status-occupied { border-top-color: #dc3545; background-color: #fff5f5; }
+        .status-reserved { border-top-color: #0d6efd; background-color: #f0f7ff; } 
+        .charging-active { color: #ffc107; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .chart-container { height: 220px; /* 稍微调小图表高度给下方腾出空间 */ }
+        
+        /* 新增仪表盘样式 */
+        .stat-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        .stat-number { font-size: 1.5rem; font-weight: bold; }
+        .text-green { color: #198754; }
+        .text-blue { color: #0d6efd; }
+        .text-orange { color: #ffc107; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-primary mb-4 shadow">
+    <div class="container"><span class="navbar-brand h1"><i class="fas fa-parking"></i> Smart Campus Parking System</span></div>
+</nav>
+
+<div class="container">
+    <div class="row">
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white"><h5 class="mb-0">Reservation (Today Only)</h5></div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">License Plate:</label>
+                        <div class="input-group">
+                            <select class="form-select bg-light" id="provinceSelect" style="max-width: 200px;">
+                               <option value="京">京 (Beijing)</option>
+                            <option value="津">津 (Tianjin)</option>
+                            <option value="冀">冀 (Hebei)</option>
+                            <option value="晋">晋 (Shanxi)</option>
+                            <option value="蒙">蒙 (Neimenggu)</option>
+                            <option value="辽">辽 (Liaoning)</option>
+                            <option value="吉">吉 (Jilin)</option>
+                            <option value="黑">黑 (Heilongjiang)</option>
+                            <option value="沪">沪 (Shanghai)</option>
+                            <option value="苏">苏 (Jiangsu)</option>
+                            <option value="浙" selected>浙 (Zhejiang)</option>
+                            <option value="皖">皖 (Anhui)</option>
+                            <option value="闽">闽 (Fujian)</option>
+                            <option value="赣">赣 (Jiangxi)</option>
+                            <option value="鲁">鲁 (Shandong)</option>
+                            <option value="豫">豫 (Henan)</option>
+                            <option value="鄂">鄂 (Hubei)</option>
+                            <option value="湘">湘 (Hunan)</option>
+                            <option value="粤">粤 (Guangdong)</option>
+                            <option value="桂">桂 (Guangxi)</option>
+                            <option value="琼">琼 (Hainan)</option>
+                            <option value="渝">渝 (Chongqing)</option>
+                            <option value="川">川 (Sichuan)</option>
+                            <option value="贵">贵 (Guizhou)</option>
+                            <option value="云">云 (Yunnan)</option>
+                            <option value="藏">藏 (Tibet)</option>
+                            <option value="陕">陕 (Shaanxi)</option>
+                            <option value="甘">甘 (Gansu)</option>
+                            <option value="青">青 (Qinghai)</option>
+                            <option value="宁">宁 (Ningxia)</option>
+                            <option value="新">新 (Xinjiang)</option>
+                            </select>
+                            <select class="form-select bg-light" id="citySelect" style="max-width: 70px;">
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                            <option value="E">E</option>
+                            <option value="F">F</option>
+                            <option value="G">G</option>
+                            <option value="H">H</option>
+                            <option value="J">J</option>
+                            <option value="K">K</option>
+                            <option value="L">L</option>
+                            <option value="M">M</option>
+                            </select>
+                            <input type="text" id="plateNumber" class="form-control" placeholder="88888">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Start Time (Today):</label>
+                        <input type="time" id="startTimeInput" class="form-control">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Duration Mode:</label>
+                        <div class="d-flex gap-3 mb-2">
+                            <div class="form-check"><input class="form-check-input" type="radio" name="resMode" id="modeDuration" checked onclick="toggleMode()"><label class="form-check-label" for="modeDuration">Duration</label></div>
+                            <div class="form-check"><input class="form-check-input" type="radio" name="resMode" id="modeEndTime" onclick="toggleMode()"><label class="form-check-label" for="modeEndTime">End Time</label></div>
+                        </div>
+                        <div id="durationInputs" class="row g-2">
+                            <div class="col-6"><div class="input-group"><input type="number" id="inputHours" class="form-control" value="1"><span class="input-group-text">Hrs</span></div></div>
+                            <div class="col-6"><div class="input-group"><input type="number" id="inputMinutes" class="form-control" value="0"><span class="input-group-text">Mins</span></div></div>
+                        </div>
+                        <div id="endTimeInputs" class="d-none"><input type="time" id="endTimeInput" class="form-control"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select Slot & 4-Digit PIN:</label>
+                        <div class="input-group">
+                            <select id="slotSelect" class="form-select">
+                                <option value="1">Slot #1</option><option value="2">Slot #2</option>
+                                <option value="3">Slot #3</option><option value="4">Slot #4</option>
+                            </select>
+                            <input type="password" id="resPin" class="form-control" placeholder="Set PIN" maxlength="4" inputmode="numeric">
+                        </div>
+                        <small class="text-muted">PIN is required to cancel reservation later.</small>
+                    </div>
+                    
+                    <button onclick="makeReservation()" class="btn btn-primary w-100">Confirm Reservation</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white"><h5 class="mb-0">Charging Activity & Overview</h5></div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chargingChart"></canvas>
+                    </div>
+                    
+                    <hr class="my-4">
+                    <h6 class="text-muted mb-3"><i class="fas fa-tachometer-alt"></i> Real-time Dashboard</h6>
+                    <div class="row g-3">
+                        <div class="col-4">
+                            <div class="stat-box">
+                                <div class="text-green stat-number" id="stat-available">0</div>
+                                <div class="small text-muted">Available</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-box">
+                                <div class="text-blue stat-number" id="stat-reserved">0</div>
+                                <div class="small text-muted">Reserved</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-box">
+                                <div class="text-orange stat-number" id="stat-charging">0</div>
+                                <div class="small text-muted">Charging</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h4 class="mb-3">Live Status</h4>
+    <div class="row" id="slots-container"></div>
+    
+    <footer class="mt-5 mb-4 text-center text-secondary">
+        <p class="mb-1 fw-bold">Beijing Jiaotong University / Lancaster University</p>
+        <p class="small">Graduation Project: Communication Engineering | Designed by Yangliwei</p>
+    </footer>
+</div>
+
+<script>
+    // --- 初始化默认时间为当前时间的 HH:mm ---
+    function setDefaultTime() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('startTimeInput').value = `${hours}:${minutes}`;
+    }
+    setDefaultTime();
+
+    function toggleMode() {
+        const isDuration = document.getElementById('modeDuration').checked;
+        document.getElementById('durationInputs').classList.toggle('d-none', !isDuration);
+        document.getElementById('endTimeInputs').classList.toggle('d-none', isDuration);
+    }
+
+    // --- Chart.js ---
+    const ctx = document.getElementById('chargingChart').getContext('2d');
+    const chargingChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Array.from({length: 24}, (_, i) => i + ":00"),
+            datasets: [{ label: 'Charging Sessions', data: [], backgroundColor: 'rgba(13, 110, 253, 0.7)', borderRadius: 4 }]
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+
+    // --- 辅助函数：拼接今天日期 ---
+    function getFullTimestamp(timeStr) {
+        if (!timeStr) return null;
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}T${timeStr}`;
+    }
+
+    // --- 核心业务逻辑 ---
+    function makeReservation() {
+        const pin = document.getElementById('resPin').value;
+        const number = document.getElementById('plateNumber').value.trim();
+        const startTimeVal = document.getElementById('startTimeInput').value;
+        
+        if(!number || pin.length !== 4) { alert("Please enter plate and 4-digit PIN!"); return; }
+        if(!startTimeVal) { alert("Please select a start time!"); return; }
+
+        // 拼接日期 + 时间
+        const fullStartTime = getFullTimestamp(startTimeVal);
+        let fullEndTime = null;
+
+        // 如果是 End Time 模式，也要拼接
+        if (document.getElementById('modeEndTime').checked) {
+            const endTimeVal = document.getElementById('endTimeInput').value;
+            if(!endTimeVal) { alert("Please select an end time!"); return; }
+            fullEndTime = getFullTimestamp(endTimeVal);
+        }
+
+        const payload = {
+            id: document.getElementById('slotSelect').value,
+            plate: document.getElementById('provinceSelect').value + document.getElementById('citySelect').value + number.toUpperCase(),
+            startTime: fullStartTime, // 发送完整的 ISO 格式
+            pin: pin,
+            mode: document.getElementById('modeDuration').checked ? 'duration' : 'endtime',
+            hours: document.getElementById('inputHours').value,
+            minutes: document.getElementById('inputMinutes').value,
+            endTime: fullEndTime,     // 发送完整的 ISO 格式
+            action: 'reserve'
+        };
+
+        fetch('/api/reserve', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        }).then(res => res.json()).then(data => {
+            alert(data.message);
+            if(data.success) fetchStatus();
+        });
+    }
+
+    function cancelReservation(slotId) {
+        const userPin = prompt("Enter 4-digit PIN to cancel:");
+        if (userPin === null) return;
+
+        fetch('/api/reserve', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ id: slotId, action: 'cancel', pin: userPin })
+        }).then(res => res.json()).then(data => {
+            if(!data.success) alert(data.message);
+            fetchStatus();
+        });
+    }
+
+    function fetchStatus() {
+        fetch('/api/status').then(res => res.json()).then(data => {
+            const container = document.getElementById('slots-container');
+            container.innerHTML = ''; 
+            
+            // 统计变量
+            let availableCount = 0;
+            let reservedCount = 0;
+            let chargingCount = 0;
+
+            data.forEach(slot => {
+                // 统计逻辑
+                if (slot.charging) chargingCount++;
+                if (slot.occupied) {
+                     // 物理占用算作 Reserved 或 Occupied 都可以，这里归类统计
+                }
+                if (!slot.occupied && !slot.license_plate) availableCount++;
+                if (slot.license_plate) reservedCount++;
+
+                let statusClass = slot.occupied ? 'status-occupied' : (slot.license_plate ? 'status-reserved' : 'status-free');
+                let statusText = slot.occupied ? 'Occupied' : (slot.license_plate ? 'Reserved' : 'Available');
+                let info = slot.license_plate ? `<div class="small text-primary mt-2"><b>${slot.license_plate}</b><br>${slot.start_time.split(' ')[1].slice(0,5)}-${slot.end_time.split(' ')[1].slice(0,5)}</div>` : '<small class="text-muted">Free</small>';
+                let btn = slot.license_plate && !slot.occupied ? `<button onclick="cancelReservation(${slot.id})" class="btn btn-sm btn-outline-danger mt-2 w-100">Cancel</button>` : '';
+
+                container.innerHTML += `
+                <div class="col-md-3 mb-4">
+                    <div class="card shadow slot-card ${statusClass} h-100">
+                        <div class="card-body text-center">
+                            <h6>Slot #${slot.id}</h6>
+                            <div class="my-2">${slot.charging ? '<i class="fas fa-bolt fa-2x charging-active"></i>' : '<i class="fas fa-plug fa-2x text-muted"></i>'}</div>
+                            <div class="fw-bold">${statusText}</div>
+                            ${info} ${btn}
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            // 更新仪表盘数字
+            document.getElementById('stat-available').innerText = availableCount;
+            document.getElementById('stat-reserved').innerText = reservedCount;
+            document.getElementById('stat-charging').innerText = chargingCount;
+        });
+    }
+
+    function updateChart() {
+        fetch('/api/stats').then(res => res.json()).then(data => {
+            chargingChart.data.datasets[0].data = data;
+            chargingChart.update();
+        });
+    }
+
+    setInterval(fetchStatus, 2000);
+    setInterval(updateChart, 10000);
+    fetchStatus();
+    updateChart();
+</script>
+</body>
+</html>
