@@ -33,20 +33,23 @@ const int DISTANCE_THRESHOLD = 50;
 struct ParkingSlot {
   int id;
   int echoPin;
+  int buttonpin;
   int isOccupied;        
   int lastReportedState; 
+  int isCharging;        // 充电状态 (0闲置, 1充电)
+  int lastButtonState;   // 记录按键上次的电平 (用于检测按下瞬间)
 };
 
 ParkingSlot slots[4] = {
-  {1, 13, 0, -1}, 
-  {2, 14, 0, -1},
-  {3, 18, 0, -1},
-  {4, 19, 0, -1}
+  {1, 13, 32, 0, -1, 0,HIGH}, 
+  {2, 14, 33, 0, -1, 0,HIGH},
+  {3, 18, 35, 0, -1, 0,HIGH},
+  {4, 19, 34, 0, -1, 0,HIGH}
 };
 
 // ================= 函数声明 =================
 float getDistance(int echoPin);
-void sendStatusToServer(int slot_id, int occupied);
+void sendStatusToServer(int slot_id, int occupied, int charging);
 void verifyPlateWithServer(String plate);
 void safeOLEDPrint(String line1, String line2);
 void triggerAlarm();
@@ -55,6 +58,7 @@ void triggerAlarm();
 void TaskSensors(void *pvParameters);
 void TaskK230UART(void *pvParameters);
 void TaskEnvMonitor(void *pvParameters); // 环境监测任务
+void TaskButtons(void *pvParameters); // 按键监测任务
 
 void setup() {
   Serial.begin(115200);
@@ -66,6 +70,7 @@ void setup() {
 
   for (int i = 0; i < 4; i++) {
     pinMode(slots[i].echoPin, INPUT);
+    pinMode(slots[i].buttonpin, INPUT_PULLUP); // 按键使用内置上拉
   }
 
   // 1. 初始化互斥锁 (非常重要，必须在初始化 I2C 设备前创建)
@@ -121,10 +126,46 @@ xTaskCreatePinnedToCore(
   );
   // 温湿度任务
   xTaskCreatePinnedToCore(TaskEnvMonitor, "EnvTask", 4096, NULL, 1, NULL, 1); 
+  // 按键任务
+  xTaskCreatePinnedToCore(TaskButtons, "ButtonTask", 4096, NULL, 2, NULL, 1); 
+  
 }
 
 void loop() {
   vTaskDelay(1000); 
+}
+
+// ================= 按键扫描与充电控制 =================
+void TaskButtons(void *pvParameters) {
+  while (1) {
+    for (int i = 0; i < 4; i++) {
+      int reading = digitalRead(slots[i].buttonpin);
+      
+      // 检测下降沿 (当前是LOW，上次是HIGH，说明刚刚按下了按键)
+      if (reading == LOW && slots[i].lastButtonState == HIGH) {
+        
+        // 智能联动逻辑: 只有车位上有车时，才允许启动充电
+        if (slots[i].isOccupied == 1) {
+            slots[i].isCharging = !slots[i].isCharging; // 状态翻转 (0变1，1变0)
+            Serial.printf("[Button] Slot %d Charging state: %d\n", slots[i].id, slots[i].isCharging);
+            
+            safeOLEDPrint("Slot " + String(slots[i].id), slots[i].isCharging ? "Charging ON" : "Charging OFF");
+            
+            // 立即上报最新状态到服务器
+            sendStatusToServer(slots[i].id, slots[i].isOccupied, slots[i].isCharging);
+        } else {
+            // 没车按充电没反应，并提示
+            Serial.printf("[Button] Slot %d is empty! Cannot charge.\n", slots[i].id);
+            safeOLEDPrint("Slot " + String(slots[i].id), "Empty! Cannot Charge");
+            triggerAlarm(); // 滴一声提示操作无效
+        }
+      }
+      slots[i].lastButtonState = reading; // 记录当前状态，供下次比较
+    }
+    
+    // 按键防抖延时 (非常关键，防止按一下触发好几次)
+    vTaskDelay(pdMS_TO_TICKS(50)); 
+  }
 }
 
 // ================= I2C 线程安全显示函数 =================
@@ -250,10 +291,10 @@ void verifyPlateWithServer(String plate) {
   }
 }
 
-void sendStatusToServer(int slot_id, int occupied) {
+void sendStatusToServer(int slot_id, int occupied, int charging) {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
-    String url = serverBaseUrl + "/update?id=" + String(slot_id) + "&occupied=" + String(occupied) + "&charging=0";
+    String url = serverBaseUrl + "/update?id=" + String(slot_id) + "&occupied=" + String(occupied) + "&charging=" + String(charging);
     http.begin(url);
     int httpCode = http.GET();
     if(httpCode > 0) {
