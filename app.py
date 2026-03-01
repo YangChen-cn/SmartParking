@@ -4,6 +4,10 @@ import datetime
 
 app = Flask(__name__)
 
+# --- 新增: 全局变量存储温湿度 ---
+current_temp = "--"
+current_hum = "--"
+
 # --- 数据库初始化 ---
 def init_db():
     conn = sqlite3.connect('parking.db')
@@ -68,6 +72,44 @@ def get_status():
     conn.close()
     return jsonify(data)
 
+# --- 新增: 接收温湿度数据接口 (给ESP32用) ---
+@app.route('/update_env')
+def update_env():
+    global current_temp, current_hum
+    current_temp = request.args.get('temp', '--')
+    current_hum = request.args.get('hum', '--')
+    return "OK"
+
+# --- 新增: 前端获取温湿度接口 (给网页用) ---
+@app.route('/api/env')
+def api_env():
+    return jsonify({'temp': current_temp, 'hum': current_hum})
+
+# --- 新增: 给 ESP32 验证车牌用的接口 ---
+@app.route('/api/verify', methods=['POST'])
+def verify_plate():
+    # 获取 ESP32 发来的纯文本车牌号 (使用 utf-8 解码处理中文)
+    plate_from_esp32 = request.data.decode('utf-8').strip()
+    
+    if not plate_from_esp32:
+        return "ERROR: Empty Plate"
+
+    conn = sqlite3.connect('parking.db')
+    c = conn.cursor()
+    
+    # 在数据库的 slots 表里寻找这个车牌
+    c.execute('SELECT id FROM slots WHERE license_plate = ?', (plate_from_esp32,))
+    row = c.fetchone()
+    conn.close()
+    
+    # 如果找到了，返回 "OK,车位号"
+    if row:
+        slot_id = row[0]
+        return f"OK,{slot_id}"
+    else:
+        # 如果没找到，说明没预约，或者是乱停的
+        return "FAIL"
+    
 # --- 预约/取消接口 ---
 @app.route('/api/reserve', methods=['POST'])
 def reserve_slot():
@@ -142,18 +184,31 @@ def get_stats():
 @app.route('/update', methods=['GET'])
 def update_slot():
     slot_id, occupied, charging = request.args.get('id'), request.args.get('occupied'), request.args.get('charging')
+    response_msg = "OK" # 默认回复 OK
+    
     if slot_id:
         conn = sqlite3.connect('parking.db')
         c = conn.cursor()
-        if occupied is not None: c.execute('UPDATE slots SET occupied = ? WHERE id = ?', (occupied, slot_id))
+        
+        if occupied is not None: 
+            c.execute('UPDATE slots SET occupied = ? WHERE id = ?', (occupied, slot_id))
+            
+            # --- 核心逻辑: 检查是否违停 (被占用且没有预约车牌) ---
+            if int(occupied) == 1:
+                c.execute('SELECT license_plate FROM slots WHERE id = ?', (slot_id,))
+                row = c.fetchone()
+                if row and row[0] is None:
+                    response_msg = "ALARM" # 未预约却被占用，下发报警指令给ESP32！
+                    
         if charging is not None:
             c.execute('SELECT charging FROM slots WHERE id = ?', (slot_id,))
             if int(charging) == 1 and c.fetchone()[0] == 0:
                 c.execute('INSERT INTO charging_logs (slot_id) VALUES (?)', (slot_id,))
             c.execute('UPDATE slots SET charging = ? WHERE id = ?', (charging, slot_id))
+            
         conn.commit()
         conn.close()
-        return "Success"
+        return response_msg
     return "Error"
 
 if __name__ == '__main__':

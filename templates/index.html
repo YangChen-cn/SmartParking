@@ -38,6 +38,18 @@
 </nav>
 
 <div class="container">
+    
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card shadow-sm bg-info text-white border-0">
+                <div class="card-body d-flex justify-content-around align-items-center py-2">
+                    <h5 class="mb-0"><i class="fas fa-thermometer-half"></i> Temp: <span id="tempDisplay" class="fw-bold">--</span> °C</h5>
+                    <h5 class="mb-0"><i class="fas fa-tint"></i> Humidity: <span id="humDisplay" class="fw-bold">--</span> %</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col-lg-5 mb-4">
             <div class="card shadow-sm h-100">
@@ -255,7 +267,10 @@
             body: JSON.stringify(payload)
         }).then(res => res.json()).then(data => {
             alert(data.message);
-            if(data.success) fetchStatus();
+            if(data.success) {
+                fetchStatus();
+                document.getElementById('resPin').value = ''; // 预约成功清空PIN输入框
+            }
         });
     }
 
@@ -324,10 +339,23 @@
         });
     }
 
+    // --- 新增: 获取并更新温湿度数据 ---
+    function fetchEnv() {
+        fetch('/api/env').then(res => res.json()).then(data => {
+            document.getElementById('tempDisplay').innerText = data.temp;
+            document.getElementById('humDisplay').innerText = data.hum;
+        }).catch(err => console.error("Env fetch error:", err));
+    }
+
+    // 设置定时刷新任务
     setInterval(fetchStatus, 2000);
     setInterval(updateChart, 10000);
+    setInterval(fetchEnv, 3000); // 3秒刷新一次环境数据
+    
+    // 初始拉取数据
     fetchStatus();
     updateChart();
+    fetchEnv();
 </script>
 </body>
 </html>
