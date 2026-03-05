@@ -135,39 +135,6 @@ void loop() {
   vTaskDelay(1000); 
 }
 
-// ================= 按键扫描与充电控制 =================
-void TaskButtons(void *pvParameters) {
-  while (1) {
-    for (int i = 0; i < 4; i++) {
-      int reading = digitalRead(slots[i].buttonpin);
-      
-      // 检测下降沿 (当前是LOW，上次是HIGH，说明刚刚按下了按键)
-      if (reading == LOW && slots[i].lastButtonState == HIGH) {
-        
-        // 智能联动逻辑: 只有车位上有车时，才允许启动充电
-        if (slots[i].isOccupied == 1) {
-            slots[i].isCharging = !slots[i].isCharging; // 状态翻转 (0变1，1变0)
-            Serial.printf("[Button] Slot %d Charging state: %d\n", slots[i].id, slots[i].isCharging);
-            
-            safeOLEDPrint("Slot " + String(slots[i].id), slots[i].isCharging ? "Charging ON" : "Charging OFF");
-            
-            // 立即上报最新状态到服务器
-            sendStatusToServer(slots[i].id, slots[i].isOccupied, slots[i].isCharging);
-        } else {
-            // 没车按充电没反应，并提示
-            Serial.printf("[Button] Slot %d is empty! Cannot charge.\n", slots[i].id);
-            safeOLEDPrint("Slot " + String(slots[i].id), "Empty! Cannot Charge");
-            triggerAlarm(); // 滴一声提示操作无效
-        }
-      }
-      slots[i].lastButtonState = reading; // 记录当前状态，供下次比较
-    }
-    
-    // 按键防抖延时 (非常关键，防止按一下触发好几次)
-    vTaskDelay(pdMS_TO_TICKS(50)); 
-  }
-}
-
 // ================= I2C 线程安全显示函数 =================
 void safeOLEDPrint(String line1, String line2) {
   // 请求互斥锁，最多等待 portMAX_DELAY (死等)
@@ -206,12 +173,19 @@ void TaskSensors(void *pvParameters) {
       float distance = getDistance(slots[i].echoPin);
       slots[i].isOccupied = (distance > 0 && distance < DISTANCE_THRESHOLD) ? 1 : 0;
 
+      // 智能联动逻辑: 如果车开走了，强制关闭充电状态
+      if (slots[i].isOccupied == 0 && slots[i].isCharging == 1) {
+         slots[i].isCharging = 0;
+         Serial.printf("[Sensor] Car left Slot %d. Auto-stopped charging.\n", slots[i].id);
+      }
+
       if (slots[i].isOccupied != slots[i].lastReportedState) {
-        sendStatusToServer(slots[i].id, slots[i].isOccupied);
+        // 边沿触发--- 传入状态 ---
+        sendStatusToServer(slots[i].id, slots[i].isOccupied, slots[i].isCharging);
         slots[i].lastReportedState = slots[i].isOccupied;
       }
       
-      vTaskDelay(pdMS_TO_TICKS(60)); // 每个车位间隔 60ms，4 个车位总共 240ms，留点余量每 300ms 检测一次
+      vTaskDelay(pdMS_TO_TICKS(60)); 
     }
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
@@ -265,6 +239,39 @@ void TaskEnvMonitor(void *pvParameters) {
     
     // 每 5 秒读取上传一次
     vTaskDelay(pdMS_TO_TICKS(5000)); 
+  }
+}
+
+// ================= 按键扫描与充电控制 =================
+void TaskButtons(void *pvParameters) {
+  while (1) {
+    for (int i = 0; i < 4; i++) {
+      int reading = digitalRead(slots[i].buttonpin);
+      
+      // 检测下降沿 (当前是LOW，上次是HIGH，说明刚刚按下了按键)
+      if (reading == LOW && slots[i].lastButtonState == HIGH) {
+        
+        // 智能联动逻辑: 只有车位上有车时，才允许启动充电
+        if (slots[i].isOccupied == 1) {
+            slots[i].isCharging = !slots[i].isCharging; // 状态翻转 (0变1，1变0)
+            Serial.printf("[Button] Slot %d Charging state: %d\n", slots[i].id, slots[i].isCharging);
+            
+            safeOLEDPrint("Slot " + String(slots[i].id), slots[i].isCharging ? "Charging ON" : "Charging OFF");
+            
+            // 立即上报最新状态到服务器
+            sendStatusToServer(slots[i].id, slots[i].isOccupied, slots[i].isCharging);
+        } else {
+            // 没车按充电没反应，并提示
+            Serial.printf("[Button] Slot %d is empty! Cannot charge.\n", slots[i].id);
+            safeOLEDPrint("Slot " + String(slots[i].id), "Empty! Cannot Charge");
+            triggerAlarm(); // 滴一声提示操作无效
+        }
+      }
+      slots[i].lastButtonState = reading; // 记录当前状态，供下次比较
+    }
+    
+    // 按键防抖延时 (非常关键，防止按一下触发好几次)
+    vTaskDelay(pdMS_TO_TICKS(50)); 
   }
 }
 

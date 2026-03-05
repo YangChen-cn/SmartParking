@@ -15,9 +15,8 @@
         .status-reserved { border-top-color: #0d6efd; background-color: #f0f7ff; } 
         .charging-active { color: #ffc107; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        .chart-container { height: 220px; /* 稍微调小图表高度给下方腾出空间 */ }
+        .chart-container { height: 220px; }
         
-        /* 新增仪表盘样式 */
         .stat-box {
             background: #f8f9fa;
             border-radius: 10px;
@@ -59,51 +58,43 @@
                         <label class="form-label fw-bold">License Plate:</label>
                         <div class="input-group">
                             <select class="form-select bg-light" id="provinceSelect" style="max-width: 200px;">
-                               <option value="京">京 (Beijing)</option>
-                            <option value="津">津 (Tianjin)</option>
-                            <option value="冀">冀 (Hebei)</option>
-                            <option value="晋">晋 (Shanxi)</option>
-                            <option value="蒙">蒙 (Neimenggu)</option>
-                            <option value="辽">辽 (Liaoning)</option>
-                            <option value="吉">吉 (Jilin)</option>
-                            <option value="黑">黑 (Heilongjiang)</option>
-                            <option value="沪">沪 (Shanghai)</option>
-                            <option value="苏">苏 (Jiangsu)</option>
-                            <option value="浙" selected>浙 (Zhejiang)</option>
-                            <option value="皖">皖 (Anhui)</option>
-                            <option value="闽">闽 (Fujian)</option>
-                            <option value="赣">赣 (Jiangxi)</option>
-                            <option value="鲁">鲁 (Shandong)</option>
-                            <option value="豫">豫 (Henan)</option>
-                            <option value="鄂">鄂 (Hubei)</option>
-                            <option value="湘">湘 (Hunan)</option>
-                            <option value="粤">粤 (Guangdong)</option>
-                            <option value="桂">桂 (Guangxi)</option>
-                            <option value="琼">琼 (Hainan)</option>
-                            <option value="渝">渝 (Chongqing)</option>
-                            <option value="川">川 (Sichuan)</option>
-                            <option value="贵">贵 (Guizhou)</option>
-                            <option value="云">云 (Yunnan)</option>
-                            <option value="藏">藏 (Tibet)</option>
-                            <option value="陕">陕 (Shaanxi)</option>
-                            <option value="甘">甘 (Gansu)</option>
-                            <option value="青">青 (Qinghai)</option>
-                            <option value="宁">宁 (Ningxia)</option>
-                            <option value="新">新 (Xinjiang)</option>
+                                <option value="京">京 (Beijing)</option>
+                                <option value="津">津 (Tianjin)</option>
+                                <option value="冀">冀 (Hebei)</option>
+                                <option value="晋">晋 (Shanxi)</option>
+                                <option value="蒙">蒙 (Neimenggu)</option>
+                                <option value="辽">辽 (Liaoning)</option>
+                                <option value="吉">吉 (Jilin)</option>
+                                <option value="黑">黑 (Heilongjiang)</option>
+                                <option value="沪">沪 (Shanghai)</option>
+                                <option value="苏">苏 (Jiangsu)</option>
+                                <option value="浙" selected>浙 (Zhejiang)</option>
+                                <option value="皖">皖 (Anhui)</option>
+                                <option value="闽">闽 (Fujian)</option>
+                                <option value="赣">赣 (Jiangxi)</option>
+                                <option value="鲁">鲁 (Shandong)</option>
+                                <option value="豫">豫 (Henan)</option>
+                                <option value="鄂">鄂 (Hubei)</option>
+                                <option value="湘">湘 (Hunan)</option>
+                                <option value="粤">粤 (Guangdong)</option>
+                                <option value="桂">桂 (Guangxi)</option>
+                                <option value="琼">琼 (Hainan)</option>
+                                <option value="渝">渝 (Chongqing)</option>
+                                <option value="川">川 (Sichuan)</option>
+                                <option value="贵">贵 (Guizhou)</option>
+                                <option value="云">云 (Yunnan)</option>
+                                <option value="藏">藏 (Tibet)</option>
+                                <option value="陕">陕 (Shaanxi)</option>
+                                <option value="甘">甘 (Gansu)</option>
+                                <option value="青">青 (Qinghai)</option>
+                                <option value="宁">宁 (Ningxia)</option>
+                                <option value="新">新 (Xinjiang)</option>
                             </select>
                             <select class="form-select bg-light" id="citySelect" style="max-width: 70px;">
-                            <option value="A">A</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                            <option value="D">D</option>
-                            <option value="E">E</option>
-                            <option value="F">F</option>
-                            <option value="G">G</option>
-                            <option value="H">H</option>
-                            <option value="J">J</option>
-                            <option value="K">K</option>
-                            <option value="L">L</option>
-                            <option value="M">M</option>
+                                <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+                                <option value="D">D</option><option value="E">E</option><option value="F">F</option>
+                                <option value="G">G</option><option value="H">H</option><option value="J">J</option>
+                                <option value="K">K</option><option value="L">L</option><option value="M">M</option>
                             </select>
                             <input type="text" id="plateNumber" class="form-control" placeholder="88888">
                         </div>
@@ -179,7 +170,13 @@
         </div>
     </div>
 
-    <h4 class="mb-3">Live Status</h4>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Live Status</h4>
+        <button class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#cameraModal">
+            <i class="fas fa-camera"></i> Live Snapshot
+        </button>
+    </div>
+
     <div class="row" id="slots-container"></div>
     
     <footer class="mt-5 mb-4 text-center text-secondary">
@@ -187,6 +184,23 @@
         <p class="small">Graduation Project: Communication Engineering | Designed by Yangliwei</p>
     </footer>
 </div>
+
+<div class="modal fade" id="cameraModal" tabindex="-1" aria-labelledby="cameraModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content bg-dark border-0">
+      <div class="modal-header border-secondary text-light">
+        <h5 class="modal-title" id="cameraModalLabel"><i class="fas fa-camera text-info"></i> Snapshot History</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body p-3" id="snapshot-container" style="background-color: #121212;">
+          <p class="text-center text-secondary my-4"><i class="fas fa-spinner fa-spin"></i> Loading snapshots...</p>
+      </div>
+      
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     // --- 初始化默认时间为当前时间的 HH:mm ---
@@ -238,11 +252,9 @@
         if(!number || pin.length !== 4) { alert("Please enter plate and 4-digit PIN!"); return; }
         if(!startTimeVal) { alert("Please select a start time!"); return; }
 
-        // 拼接日期 + 时间
         const fullStartTime = getFullTimestamp(startTimeVal);
         let fullEndTime = null;
 
-        // 如果是 End Time 模式，也要拼接
         if (document.getElementById('modeEndTime').checked) {
             const endTimeVal = document.getElementById('endTimeInput').value;
             if(!endTimeVal) { alert("Please select an end time!"); return; }
@@ -252,12 +264,12 @@
         const payload = {
             id: document.getElementById('slotSelect').value,
             plate: document.getElementById('provinceSelect').value + document.getElementById('citySelect').value + number.toUpperCase(),
-            startTime: fullStartTime, // 发送完整的 ISO 格式
+            startTime: fullStartTime, 
             pin: pin,
             mode: document.getElementById('modeDuration').checked ? 'duration' : 'endtime',
             hours: document.getElementById('inputHours').value,
             minutes: document.getElementById('inputMinutes').value,
-            endTime: fullEndTime,     // 发送完整的 ISO 格式
+            endTime: fullEndTime,     
             action: 'reserve'
         };
 
@@ -269,7 +281,7 @@
             alert(data.message);
             if(data.success) {
                 fetchStatus();
-                document.getElementById('resPin').value = ''; // 预约成功清空PIN输入框
+                document.getElementById('resPin').value = ''; 
             }
         });
     }
@@ -293,17 +305,12 @@
             const container = document.getElementById('slots-container');
             container.innerHTML = ''; 
             
-            // 统计变量
             let availableCount = 0;
             let reservedCount = 0;
             let chargingCount = 0;
 
             data.forEach(slot => {
-                // 统计逻辑
                 if (slot.charging) chargingCount++;
-                if (slot.occupied) {
-                     // 物理占用算作 Reserved 或 Occupied 都可以，这里归类统计
-                }
                 if (!slot.occupied && !slot.license_plate) availableCount++;
                 if (slot.license_plate) reservedCount++;
 
@@ -325,7 +332,6 @@
                 </div>`;
             });
 
-            // 更新仪表盘数字
             document.getElementById('stat-available').innerText = availableCount;
             document.getElementById('stat-reserved').innerText = reservedCount;
             document.getElementById('stat-charging').innerText = chargingCount;
@@ -339,23 +345,65 @@
         });
     }
 
-    // --- 新增: 获取并更新温湿度数据 ---
     function fetchEnv() {
         fetch('/api/env').then(res => res.json()).then(data => {
             document.getElementById('tempDisplay').innerText = data.temp;
             document.getElementById('humDisplay').innerText = data.hum;
         }).catch(err => console.error("Env fetch error:", err));
     }
+    // --- 新增: 从服务器拉取相册并渲染 ---
+    function fetchSnapshots() {
+        fetch('/api/snapshots').then(res => res.json()).then(data => {
+            const container = document.getElementById('snapshot-container');
+            container.innerHTML = ''; // 清空加载动画
+            
+            if(data.length === 0) {
+                container.innerHTML = '<p class="text-center text-muted my-4">No snapshots recorded yet.</p>';
+                return;
+            }
 
-    // 设置定时刷新任务
+            // 循环生成图片卡片
+            data.forEach(item => {
+                container.innerHTML += `
+                <div class="card bg-black border-secondary mb-4 shadow">
+                    <div class="card-header border-secondary text-light py-2 d-flex justify-content-between align-items-center">
+                        <span><i class="far fa-clock text-info"></i> ${item.time}</span>
+                        <span class="badge bg-secondary">Captured</span>
+                    </div>
+                    <div class="card-body p-0 text-center">
+                        <img src="${item.url}" class="img-fluid w-100" style="object-fit: contain; max-height: 300px;" loading="lazy" alt="Snapshot">
+                    </div>
+                </div>`;
+            });
+        }).catch(err => {
+            console.error("Snapshots fetch error:", err);
+            document.getElementById('snapshot-container').innerHTML = '<p class="text-danger text-center">Failed to load data.</p>';
+        });
+    }
+
+    // --- 监听弹窗打开事件 ---
+    // 只有当用户点击了 "Live Snapshot" 按钮，弹窗即将显示时，才去触发拉取图片的请求！
+    var cameraModalEl = document.getElementById('cameraModal');
+    cameraModalEl.addEventListener('show.bs.modal', function (event) {
+        document.getElementById('snapshot-container').innerHTML = '<p class="text-center text-secondary my-4"><i class="fas fa-spinner fa-spin"></i> Loading snapshots...</p>';
+        fetchSnapshots();
+    });
+
+    // --- 抓拍图片刷新逻辑保持不变 ---
+    function refreshCamera() {
+        const cam = document.getElementById('cameraStream');
+        if(cam) {
+            cam.src = '/static/latest_frame.jpg?t=' + new Date().getTime();
+        }
+    }
     setInterval(fetchStatus, 2000);
     setInterval(updateChart, 10000);
-    setInterval(fetchEnv, 3000); // 3秒刷新一次环境数据
-    
-    // 初始拉取数据
+    setInterval(fetchEnv, 3000); 
+     
     fetchStatus();
     updateChart();
     fetchEnv();
+    refreshCamera();
 </script>
 </body>
 </html>

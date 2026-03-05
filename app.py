@@ -1,15 +1,25 @@
 from flask import Flask, render_template, request, jsonify
 import sqlite3
 import datetime
+import os  # --- 导入 os 库 ---
 
 app = Flask(__name__)
 
-# --- 新增: 全局变量存储温湿度 ---
+# --- 确保有一个 static 文件夹来存图片 ---
+if not os.path.exists('static'):
+    os.makedirs('static')
+# ---  全局变量存储温湿度 ---
 current_temp = "--"
 current_hum = "--"
 
 # --- 数据库初始化 ---
 def init_db():
+    # 确保保存相册的文件夹存在
+    if not os.path.exists('static/snapshots'):
+        os.makedirs('static/snapshots')
+    #每次运行清除旧的抓拍记录，保持相册清爽
+    for f in os.listdir('static/snapshots'):
+        os.remove(os.path.join('static/snapshots', f))   
     conn = sqlite3.connect('parking.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS slots 
@@ -17,6 +27,11 @@ def init_db():
                   license_plate TEXT, start_time TEXT, end_time TEXT, password TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS charging_logs 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, slot_id INTEGER, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+                 
+    # --- 创建抓拍图片相册表 ---
+    c.execute('''CREATE TABLE IF NOT EXISTS snapshot_logs 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, image_url TEXT, timestamp TEXT)''')
+                 
     c.execute('SELECT count(*) FROM slots')
     if c.fetchone()[0] == 0:
         for i in range(1, 5):
@@ -27,6 +42,52 @@ def init_db():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+# =======================================================
+# ---  接收 K230 抓拍图片并生成历史记录 ---
+# =======================================================
+@app.route('/upload_frame', methods=['POST'])
+def upload_frame():
+    img_data = request.get_data()
+    
+    if img_data and len(img_data) > 0:
+        # 获取当前时间
+        now = datetime.datetime.now()
+        time_str = now.strftime('%Y-%m-%d %H:%M:%S')
+        # 以时间戳命名图片，防止覆盖 (例如: 20260305_163000.jpg)
+        filename = now.strftime('%Y%m%d_%H%M%S') + '.jpg'
+        filepath = os.path.join('static', 'snapshots', filename)
+        
+        # 写入图片到本地
+        with open(filepath, 'wb') as f:
+            f.write(img_data)
+            
+        # 将图片路径和时间存入数据库
+        conn = sqlite3.connect('parking.db')
+        c = conn.cursor()
+        c.execute('INSERT INTO snapshot_logs (image_url, timestamp) VALUES (?, ?)', ('/static/snapshots/' + filename, time_str))
+        conn.commit()
+        conn.close()
+        
+        print(f">>> [Snapshot Saved] {filename}")
+        return "Image Saved OK", 200
+    return "Failed", 400
+
+# =======================================================
+# --- [新增] 前端获取抓拍相册列表接口 ---
+# =======================================================
+@app.route('/api/snapshots')
+def get_snapshots():
+    conn = sqlite3.connect('parking.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    # 按时间倒序，获取最新的 20 张抓拍记录
+    c.execute('SELECT image_url, timestamp FROM snapshot_logs ORDER BY id DESC LIMIT 20')
+    rows = c.fetchall()
+    conn.close()
+    
+    logs = [{'url': row['image_url'], 'time': row['timestamp']} for row in rows]
+    return jsonify(logs)
 
 # --- 获取实时状态 ---
 @app.route('/api/status')
