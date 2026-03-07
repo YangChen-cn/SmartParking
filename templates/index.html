@@ -131,6 +131,12 @@
                     </div>
                     
                     <button onclick="makeReservation()" class="btn btn-primary w-100">Confirm Reservation</button>
+
+<div class="text-center mt-2">
+    <small class="text-danger fw-bold">
+        <i class="fas fa-exclamation-circle"></i> Note: Reservations will be automatically canceled if you are 5 minutes late.
+    </small>
+</div>
                 </div>
             </div>
         </div>
@@ -353,7 +359,8 @@
     }
     // --- 新增: 从服务器拉取相册并渲染 ---
     function fetchSnapshots() {
-        fetch('/api/snapshots').then(res => res.json()).then(data => {
+        // 在 URL 后面加上时间戳，强制浏览器每次都去后台拉取最新数据
+        fetch('/api/snapshots?t=' + new Date().getTime()).then(res => res.json()).then(data => {
             const container = document.getElementById('snapshot-container');
             container.innerHTML = ''; // 清空加载动画
             

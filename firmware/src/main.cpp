@@ -28,7 +28,16 @@ Adafruit_AHTX0 aht;
 // 【核心】定义 I2C 互斥锁
 SemaphoreHandle_t xI2CMutex; 
 
-const int DISTANCE_THRESHOLD = 50; 
+//车牌消息结构体
+struct PlateMessage {
+  char number[16]; 
+};
+
+//队列句柄
+QueueHandle_t xPlateQueue;
+
+// 超声波距离阈值 (单位: cm)，小于这个值认为车位被占用
+const int DISTANCE_THRESHOLD = 20; 
 
 struct ParkingSlot {
   int id;
@@ -44,7 +53,7 @@ ParkingSlot slots[4] = {
   {1, 13, 32, 0, -1, 0,HIGH}, 
   {2, 14, 33, 0, -1, 0,HIGH},
   {3, 18, 35, 0, -1, 0,HIGH},
-  {4, 19, 34, 0, -1, 0,HIGH}
+  {4, 19, 34, 0, -1, 0,HIGH},
 };
 
 // ================= 函数声明 =================
@@ -57,6 +66,7 @@ void triggerAlarm();
 // FreeRTOS 任务
 void TaskSensors(void *pvParameters);
 void TaskK230UART(void *pvParameters);
+void TaskPlateVerify(void *pvParameters);
 void TaskEnvMonitor(void *pvParameters); // 环境监测任务
 void TaskButtons(void *pvParameters); // 按键监测任务
 
@@ -105,6 +115,13 @@ void setup() {
   }
   
   safeOLEDPrint("WiFi Connected!", WiFi.localIP().toString());
+
+// 创建队列：深度为5，每个成员大小为 PlateMessage 结构体
+  xPlateQueue = xQueueCreate(5, sizeof(struct PlateMessage));
+
+  if (xPlateQueue == NULL) {
+    Serial.println("Queue creation failed!");
+  }
 // 创建 FreeRTOS 任务，分别处理传感器、UART 和环境监测
 xTaskCreatePinnedToCore(
     TaskSensors,    // 任务执行的函数
@@ -118,12 +135,14 @@ xTaskCreatePinnedToCore(
   xTaskCreatePinnedToCore(
     TaskK230UART, 
     "UartTask", 
-    8192, 
+    4096, 
     NULL, 
     2,                    // UART 任务优先级稍高，确保及时处理车牌数据
     NULL, 
     0                     // 运行在 Core 0，和 Serial 输出在同一核心，避免冲突
   );
+  // 专门负责核对车牌的任务，给 8192 栈空间处理 HTTP
+  xTaskCreatePinnedToCore(TaskPlateVerify, "VerifyTask", 8192, NULL, 1, NULL, 0);
   // 温湿度任务
   xTaskCreatePinnedToCore(TaskEnvMonitor, "EnvTask", 4096, NULL, 1, NULL, 1); 
   // 按键任务
@@ -132,7 +151,7 @@ xTaskCreatePinnedToCore(
 }
 
 void loop() {
-  vTaskDelay(1000); 
+  // 主循环不执行任何操作，所有逻辑都在 FreeRTOS 任务中处理
 }
 
 // ================= I2C 线程安全显示函数 =================
@@ -198,21 +217,45 @@ void TaskK230UART(void *pvParameters) {
     while (Serial2.available()) {
       char c = Serial2.read();
       if (c == '\n') {
-        incomingPlate.trim(); 
-        if (incomingPlate.length() > 0) {
-          safeOLEDPrint("Checking:", incomingPlate);
-          verifyPlateWithServer(incomingPlate);
+        incomingPlate.trim();
+        if (incomingPlate.length() > 0 && incomingPlate.length() < 16) {
+          // 填充结构体
+          struct PlateMessage msg;
+          memset(msg.number, 0, sizeof(msg.number));
+          strncpy(msg.number, incomingPlate.c_str(), 15);
+
+          // [核心] 发送给队列。如果队列满了，等待 10ms，再不行就放弃（防止死锁）
+          if (xQueueSend(xPlateQueue, &msg, pdMS_TO_TICKS(10)) != pdPASS) {
+            Serial.println("Queue Full! Plate dropped.");
+          }
         }
         incomingPlate = "";
       } else {
         incomingPlate += c;
       }
     }
-    vTaskDelay(pdMS_TO_TICKS(20));
+    vTaskDelay(pdMS_TO_TICKS(20)); // 适当休眠，让出 CPU
+  }
+}
+// ================= 任务 3：核对车牌并显示结果 =================
+void TaskPlateVerify(void *pvParameters) {
+  struct PlateMessage rcvMsg;
+  while (1) {
+    // [核心] 阻塞式读取：如果队列为空，任务进入 Blocked 状态，不占 CPU
+    // portMAX_DELAY 表示一直等到有数据为止
+    if (xQueueReceive(xPlateQueue, &rcvMsg, portMAX_DELAY)) {
+      String plateStr = String(rcvMsg.number);
+      
+      // 在 OLED 上显示正在核对
+      safeOLEDPrint("Checking...", plateStr);
+      
+      // 执行耗时的网络校验
+      verifyPlateWithServer(plateStr);
+    }
   }
 }
 
-// ================= 任务 3：读取 AHT20 并上报 =================
+// ================= 任务 4：读取 AHT20 并上报 =================
 void TaskEnvMonitor(void *pvParameters) {
   while (1) {
     float temp = 0.0;

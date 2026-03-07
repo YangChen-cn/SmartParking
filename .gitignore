@@ -1,9 +1,3 @@
-
-# PlatformIO 编译产物
-.pio/
-.pioenvs/
-.piolibdeps/
-
 # VS Code 配置（可选，通常建议忽略个人偏好设置）
 .vscode/.browse.vc.db
 .vscode/.gcc-flags.json
@@ -15,6 +9,11 @@
 .DS_Store
 Thumbs.db
 
-# 数据库文件
+# 忽略数据库文件
 parking.db
 
+# 忽略所有抓拍的历史照片
+static/snapshots/*
+
+# 忽略所有日志文件
+logs/*

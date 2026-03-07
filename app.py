@@ -31,12 +31,17 @@ def init_db():
     # --- 创建抓拍图片相册表 ---
     c.execute('''CREATE TABLE IF NOT EXISTS snapshot_logs 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, image_url TEXT, timestamp TEXT)''')
-                 
+
+    # ========================================================
+    # ---清空数据库里的旧抓拍记录，保持和文件夹同步 ---
+    c.execute('DELETE FROM snapshot_logs')
+    # ========================================================
+    # 初始化车位数据，如果表里没有记录的话     
     c.execute('SELECT count(*) FROM slots')
     if c.fetchone()[0] == 0:
         for i in range(1, 5):
             c.execute('INSERT INTO slots (id, occupied, charging, license_plate, start_time, end_time, password) VALUES (?, 0, 0, NULL, NULL, NULL, NULL)', (i,))
-        conn.commit()
+    conn.commit()
     conn.close()
 
 @app.route('/')

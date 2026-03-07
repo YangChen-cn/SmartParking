@@ -9,7 +9,7 @@ import ulab.numpy as np
 import image
 import aidemo
 
-# --- [新增] 导入串口、时间、网络、多线程、底层socket模块 ---
+# --- 导入串口、时间、网络、多线程、底层socket模块 ---
 from machine import UART
 from machine import FPIOA
 import time
@@ -18,7 +18,7 @@ import _thread
 import socket
 
 # ============================================================================
-# [新增] 手写 Socket HTTP 上传任务
+# 手写 Socket HTTP 上传任务
 # ============================================================================
 is_uploading = False
 
@@ -284,38 +284,38 @@ if __name__=="__main__":
                                 try:
                                     # 1. 抓取正确的宽高维度 (此时 img 还是 3, H, W 的平面格式)
                                     c, h, w = img.shape[0], img.shape[1], img.shape[2]
-                                    
+
                                     # 2.纯数学切片：将 CHW 平面彻底转换为 HWC 交织
                                     # 利用底层 C 语言级别的一维数组赋值，极其快速且完美避开所有 Bug
                                     r = img[0].flatten()
                                     g = img[1].flatten()
                                     b = img[2].flatten()
-                                    
+
                                     # 分配一块干净的内存
                                     hwc = np.zeros(c * h * w, dtype=np.uint8)
                                     # 交织写入 R, G, B
                                     hwc[0::3] = r
                                     hwc[1::3] = g
                                     hwc[2::3] = b
-                                    
+
                                     # 3. 把这块纯净交织的内存，包装成标准 RGB888 照片
                                     img_obj = image.Image(w, h, image.RGB888, data=hwc.tobytes())
-                                    
+
                                     # 4. 压缩为 JPEG 图片对象 (quality 取 40 速度和清晰度最佳)
                                     img_jpeg = img_obj.compress(quality=40)
-                                    
+
                                     # 5. 提取二进制数据
                                     try:
                                         jpg_data = bytes(img_jpeg)
                                     except:
                                         jpg_data = bytes(img_jpeg.bytearray())
-                                        
+
                                     # 多线程调用上传
                                     _thread.start_new_thread(upload_task, (jpg_data, SERVER_IP, SERVER_PORT))
                                 except Exception as e:
                                     print(" -> [THREAD ERROR]", e)
                                     is_uploading = False # 释放锁
-                            
+
 
                             sent_record[plate_str] = current_time
                         else:
