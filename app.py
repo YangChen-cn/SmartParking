@@ -235,12 +235,12 @@ def reserve_slot():
     conn.close()
     return jsonify({'success': True, 'message': msg})
 
-# --- 其余接口保持不变 ---
 @app.route('/api/stats')
 def get_stats():
     conn = sqlite3.connect('parking.db')
     c = conn.cursor()
-    c.execute('''SELECT strftime('%H', timestamp) as hour, COUNT(*) FROM charging_logs GROUP BY hour ORDER BY hour''')
+    # 加入 datetime(timestamp, 'localtime') 进行时区转换
+    c.execute('''SELECT strftime('%H', datetime(timestamp, 'localtime')) as hour, COUNT(*) FROM charging_logs GROUP BY hour ORDER BY hour''')
     rows = c.fetchall()
     conn.close()
     hours_data = {str(i).zfill(2): 0 for i in range(24)}

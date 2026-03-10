@@ -321,7 +321,7 @@
                 if (slot.license_plate) reservedCount++;
 
                 let statusClass = slot.occupied ? 'status-occupied' : (slot.license_plate ? 'status-reserved' : 'status-free');
-                let statusText = slot.occupied ? 'Occupied' : (slot.license_plate ? 'Reserved' : 'Available');
+                let statusText = slot.charging ? 'Charging' : (slot.occupied ? 'Occupied' : (slot.license_plate ? 'Reserved' : 'Available'));
                 let info = slot.license_plate ? `<div class="small text-primary mt-2"><b>${slot.license_plate}</b><br>${slot.start_time.split(' ')[1].slice(0,5)}-${slot.end_time.split(' ')[1].slice(0,5)}</div>` : '<small class="text-muted">Free</small>';
                 let btn = slot.license_plate && !slot.occupied ? `<button onclick="cancelReservation(${slot.id})" class="btn btn-sm btn-outline-danger mt-2 w-100">Cancel</button>` : '';
 

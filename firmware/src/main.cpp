@@ -5,6 +5,20 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_AHTX0.h>
+#include <Servo.h>             
+
+// ================= Serial 打印控制宏 =================
+#define ENABLE_DEBUG_SERIAL 1   // 1 启用 Serial 打印, 0 关闭所有打印
+
+#if ENABLE_DEBUG_SERIAL
+  #define DEBUG_PRINT(x) Serial.print(x)
+  #define DEBUG_PRINTLN(x) Serial.println(x)
+  #define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
+#else
+  #define DEBUG_PRINT(x)
+  #define DEBUG_PRINTLN(x)
+  #define DEBUG_PRINTF(...)
+#endif
 
 // ================= 配置区域 =================
 const char* ssid = "apple";              
@@ -16,6 +30,7 @@ String serverBaseUrl = "http://172.20.10.5:5001";
 #define K230_TX_PIN 23
 #define COMMON_TRIG_PIN 16 
 #define BUZZER_PIN 25  // TODO: 蜂鸣器引脚
+#define SERVO_PIN  4  // 舵机引脚
 
 // I2C 引脚 
 #define I2C_SDA 21
@@ -24,6 +39,7 @@ String serverBaseUrl = "http://172.20.10.5:5001";
 // ================= 全局对象与互斥锁 =================
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 Adafruit_AHTX0 aht;
+Servo gateServo;
 
 // 【核心】定义 I2C 互斥锁
 SemaphoreHandle_t xI2CMutex; 
@@ -37,7 +53,7 @@ struct PlateMessage {
 QueueHandle_t xPlateQueue;
 
 // 超声波距离阈值 (单位: cm)，小于这个值认为车位被占用
-const int DISTANCE_THRESHOLD = 20; 
+const int DISTANCE_THRESHOLD = 15; 
 
 struct ParkingSlot {
   int id;
@@ -77,13 +93,16 @@ void setup() {
   pinMode(COMMON_TRIG_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, LOW); // 默认关闭蜂鸣器
+  pinMode(SERVO_PIN, OUTPUT);
+  gateServo.attach(SERVO_PIN);
+  gateServo.write(0);           // 0° = 关
 
   for (int i = 0; i < 4; i++) {
     pinMode(slots[i].echoPin, INPUT);
     pinMode(slots[i].buttonpin, INPUT_PULLUP); // 按键使用内置上拉
   }
 
-  // 1. 初始化互斥锁 (非常重要，必须在初始化 I2C 设备前创建)
+  // 1. 初始化互斥锁 
   xI2CMutex = xSemaphoreCreateMutex();
 
   // 2. 初始化 I2C 总线
@@ -92,7 +111,7 @@ void setup() {
   // 3. 安全初始化 OLED 和 AHT20
   if (xSemaphoreTake(xI2CMutex, portMAX_DELAY)) {
     if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-      Serial.println(F("SSD1306 allocation failed"));
+      DEBUG_PRINTLN(F("SSD1306 allocation failed"));
     } else {
       display.clearDisplay();
       display.setTextSize(1);
@@ -103,15 +122,15 @@ void setup() {
     }
     
     if (!aht.begin()) {
-      Serial.println("Could not find AHT? Check wiring");
+      DEBUG_PRINTLN("Could not find AHT? Check wiring");
     }
     xSemaphoreGive(xI2CMutex); // 释放锁
   }
 
   WiFi.begin(ssid, password);
-  Serial.print("Connecting WiFi");
+  DEBUG_PRINT("Connecting WiFi");
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500); Serial.print(".");
+    delay(500); DEBUG_PRINT(".");
   }
   
   safeOLEDPrint("WiFi Connected!", WiFi.localIP().toString());
@@ -120,7 +139,7 @@ void setup() {
   xPlateQueue = xQueueCreate(5, sizeof(struct PlateMessage));
 
   if (xPlateQueue == NULL) {
-    Serial.println("Queue creation failed!");
+    DEBUG_PRINTLN("Queue creation failed!");
   }
 // 创建 FreeRTOS 任务，分别处理传感器、UART 和环境监测
 xTaskCreatePinnedToCore(
@@ -189,13 +208,18 @@ void triggerAlarm() {
 void TaskSensors(void *pvParameters) {
   while (1) { 
     for (int i = 0; i < 4; i++) {
-      float distance = getDistance(slots[i].echoPin);
-      slots[i].isOccupied = (distance > 0 && distance < DISTANCE_THRESHOLD) ? 1 : 0;
+      int count = 0;
+      for (int k = 0; k < 5; k++) {
+        float d = getDistance(slots[i].echoPin);
+        if (d > 0 && d < DISTANCE_THRESHOLD) count++;
+        vTaskDelay(pdMS_TO_TICKS(20));
+      }
+      slots[i].isOccupied = (count >= 3);
 
       // 智能联动逻辑: 如果车开走了，强制关闭充电状态
       if (slots[i].isOccupied == 0 && slots[i].isCharging == 1) {
          slots[i].isCharging = 0;
-         Serial.printf("[Sensor] Car left Slot %d. Auto-stopped charging.\n", slots[i].id);
+         DEBUG_PRINTF("[Sensor] Car left Slot %d. Auto-stopped charging.\n", slots[i].id);
       }
 
       if (slots[i].isOccupied != slots[i].lastReportedState) {
@@ -226,7 +250,7 @@ void TaskK230UART(void *pvParameters) {
 
           // [核心] 发送给队列。如果队列满了，等待 10ms，再不行就放弃（防止死锁）
           if (xQueueSend(xPlateQueue, &msg, pdMS_TO_TICKS(10)) != pdPASS) {
-            Serial.println("Queue Full! Plate dropped.");
+            DEBUG_PRINTLN("Queue Full! Plate dropped.");
           }
         }
         incomingPlate = "";
@@ -247,7 +271,7 @@ void TaskPlateVerify(void *pvParameters) {
       String plateStr = String(rcvMsg.number);
       
       // 在 OLED 上显示正在核对
-      safeOLEDPrint("Checking...", plateStr);
+      safeOLEDPrint("Checking...", "");
       
       // 执行耗时的网络校验
       verifyPlateWithServer(plateStr);
@@ -297,7 +321,7 @@ void TaskButtons(void *pvParameters) {
         // 智能联动逻辑: 只有车位上有车时，才允许启动充电
         if (slots[i].isOccupied == 1) {
             slots[i].isCharging = !slots[i].isCharging; // 状态翻转 (0变1，1变0)
-            Serial.printf("[Button] Slot %d Charging state: %d\n", slots[i].id, slots[i].isCharging);
+            DEBUG_PRINTF("[Button] Slot %d Charging state: %d\n", slots[i].id, slots[i].isCharging);
             
             safeOLEDPrint("Slot " + String(slots[i].id), slots[i].isCharging ? "Charging ON" : "Charging OFF");
             
@@ -305,7 +329,7 @@ void TaskButtons(void *pvParameters) {
             sendStatusToServer(slots[i].id, slots[i].isOccupied, slots[i].isCharging);
         } else {
             // 没车按充电没反应，并提示
-            Serial.printf("[Button] Slot %d is empty! Cannot charge.\n", slots[i].id);
+            DEBUG_PRINTF("[Button] Slot %d is empty! Cannot charge.\n", slots[i].id);
             safeOLEDPrint("Slot " + String(slots[i].id), "Empty! Cannot Charge");
             triggerAlarm(); // 滴一声提示操作无效
         }
@@ -321,24 +345,29 @@ void TaskButtons(void *pvParameters) {
 // ================= 底层功能函数 =================
 
 void verifyPlateWithServer(String plate) {
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.begin(serverBaseUrl + "/api/verify");
-    http.addHeader("Content-Type", "text/plain; charset=utf-8"); 
-    int httpCode = http.POST(plate); 
-    
-    if (httpCode > 0) {
-      String response = http.getString();
-      if (response.startsWith("OK")) {
-        String slotNumber = response.substring(3); 
-        safeOLEDPrint("WELCOME!", plate + "\nSlot: " + slotNumber);
-      } else if (response == "FAIL") {
-        safeOLEDPrint("DENIED", "Please\nReserve First!");
-        triggerAlarm(); // 未预约在门口逗留，也给个报警提示
-      }
+    if (WiFi.status() == WL_CONNECTED) {
+        HTTPClient http;
+        http.begin(serverBaseUrl + "/api/verify");
+        http.addHeader("Content-Type", "text/plain; charset=utf-8");
+        int httpCode = http.POST(plate);
+
+        if (httpCode > 0) {
+            String response = http.getString();
+            if (response.startsWith("OK")) {
+                String slotNumber = response.substring(3);
+                safeOLEDPrint("WELCOME!", "Slot: " + slotNumber);
+
+                // **servo logic**
+                gateServo.write(90);              // 打开舵机（角度根据安装调整）
+                vTaskDelay(pdMS_TO_TICKS(5000));  // 保持 5 秒
+                gateServo.write(0);               // 关闭舵机
+            } else if (response == "FAIL") {
+                safeOLEDPrint("DENIED", "Please\nReserve First!");
+                triggerAlarm();
+            }
+        }
+        http.end();
     }
-    http.end();
-  }
 }
 
 void sendStatusToServer(int slot_id, int occupied, int charging) {
@@ -351,7 +380,7 @@ void sendStatusToServer(int slot_id, int occupied, int charging) {
        String response = http.getString();
        // 【核心逻辑】：解析后端传回的 ALARM 指令
        if(response == "ALARM") {
-          Serial.printf(">>> [ALARM] Slot %d 违停！\n", slot_id);
+          DEBUG_PRINTF(">>> [ALARM] Slot %d 违停！\n", slot_id);
           safeOLEDPrint("WARNING!", "Slot " + String(slot_id) + "\nUnreserved!");
           triggerAlarm(); // 触发物理蜂鸣器
        }
