@@ -200,133 +200,95 @@ if __name__=="__main__":
     # --- [配置区] WiFi 与服务器信息 ---
     SSID = "apple"
     PASSWORD = "12345687"
-    SERVER_IP = "172.20.10.5"      # TODO: 确认你电脑的 IP 地址
-    SERVER_PORT = 5001
+    SERVER_HOST = "api.campusparking.xyz"
+    SERVER_PORT = 80
+    # 初始化 Pipeline (适配 800x480 屏幕)
+    rgb888p_size = [640, 360]
+    pl = PipeLine(rgb888p_size=rgb888p_size, display_mode="lcd")
+    pl.create()
+    display_size = pl.get_display_size() # 得到 [800, 480]
 
-    # --- 1. 连接 WiFi ---
+    # --- 屏幕调试信息：WiFi 连接 ---
+    pl.osd_img.clear()
+    pl.osd_img.draw_string_advanced(200, 200, 40, "Connecting WiFi...", color=(255, 255, 0, 0))
+    pl.show_image()
+
     sta = network.WLAN(network.STA_IF)
     sta.active(True)
-    # 修复 f-string 错误
-    print("Connecting to WiFi {}...".format(SSID))
     sta.connect(SSID, PASSWORD)
 
     max_wait = 10
     while not sta.isconnected() and max_wait > 0:
         time.sleep(1)
         max_wait -= 1
-        print(".", end="")
-    if sta.isconnected():
-        print("\nWiFi Connected! IP:", sta.ifconfig()[0])
-    else:
-        print("\nWiFi Connect Failed!")
 
-    # --- 2. 串口初始化 ---
+    if sta.isconnected():
+        msg = "WiFi Connected! IP: " + sta.ifconfig()[0]
+        print(msg)
+        pl.osd_img.clear()
+        pl.osd_img.draw_string_advanced(150, 200, 32, msg, color=(255, 0, 255, 0))
+        pl.show_image()
+        time.sleep(3) # 持续显示3秒
+    else:
+        pl.osd_img.clear()
+        pl.osd_img.draw_string_advanced(200, 200, 40, "WiFi Connect Failed!", color=(255, 255, 0, 0))
+        pl.show_image()
+        time.sleep(2)
+
+    # --- 硬件初始化 ---
     fpioa = FPIOA()
     fpioa.set_function(11, FPIOA.UART2_TXD)
     fpioa.set_function(12, FPIOA.UART2_RXD)
     uart = UART(UART.UART2, baudrate=115200, bits=UART.EIGHTBITS, parity=UART.PARITY_NONE, stop=UART.STOPBITS_ONE)
-    print("UART2 Init Success!")
 
-    # --- 3. 防抖记录字典 ---
+    lr = LicenceRec(
+        "/sdcard/examples/kmodel/yolo_license_plate_det.kmodel",
+        "/sdcard/examples/kmodel/licence_reco.kmodel",
+        det_input_size=[640,640], rec_input_size=[220,32],
+        rgb888p_size=rgb888p_size, display_size=display_size
+    )
+
     sent_record = {}
     COOLDOWN_TIME = 30
 
-    # --- 4. 模型初始化 ---
-    display_mode="lcd"
-    rgb888p_size = [640,360]
-    licence_det_kmodel_path="/sdcard/examples/kmodel/yolo_license_plate_det.kmodel"
-    licence_rec_kmodel_path="/sdcard/examples/kmodel/licence_reco.kmodel"
-    licence_det_input_size=[640,640]
-    licence_rec_input_size=[220,32]
-    confidence_threshold=0.2
-    nms_threshold=0.2
-
-    pl=PipeLine(rgb888p_size=rgb888p_size,display_mode=display_mode)
-    pl.create()
-    display_size=pl.get_display_size()
-
-    lr=LicenceRec(licence_det_kmodel_path,licence_rec_kmodel_path,
-                  det_input_size=licence_det_input_size,
-                  rec_input_size=licence_rec_input_size,
-                  confidence_threshold=confidence_threshold,
-                  nms_threshold=nms_threshold,
-                  rgb888p_size=rgb888p_size,
-                  display_size=display_size)
-
-    # --- 5. 主循环 ---
     try:
         while True:
-            with ScopedTiming("total",1):
-                img=pl.get_frame()
-                det_res,rec_res=lr.run(img)
-                lr.draw_result(pl,det_res,rec_res)
-                pl.show_image()
+            img = pl.get_frame()
+            det_res, rec_res = lr.run(img)
+            lr.draw_result(pl, det_res, rec_res)
+            pl.show_image()
 
-                if rec_res:
-                    current_time = time.time()
+            if rec_res:
+                current_time = time.time()
+                for plate_str in rec_res:
+                    plate_str = plate_str.strip()
+                    if not is_valid_plate(plate_str): continue
 
-                    for plate_str in rec_res:
-                        plate_str = plate_str.strip()
+                    if (current_time - sent_record.get(plate_str, 0)) > COOLDOWN_TIME:
+                        # 串口发送
+                        uart.write(plate_str + "\n")
+                        print("[UART SENT] {}".format(plate_str))
 
-                        if not is_valid_plate(plate_str):
-                            continue
+                        # 异步上传逻辑
+                        if not is_uploading:
+                            is_uploading = True
+                            try:
+                                c, h, w = img.shape[0], img.shape[1], img.shape[2]
+                                r, g, b = img[0].flatten(), img[1].flatten(), img[2].flatten()
+                                hwc = np.zeros(c * h * w, dtype=np.uint8)
+                                hwc[0::3], hwc[1::3], hwc[2::3] = r, g, b
+                                img_obj = image.Image(w, h, image.RGB888, data=hwc.tobytes())
+                                img_jpeg = img_obj.compress(quality=40)
+                                jpg_data = bytes(img_jpeg) if hasattr(img_jpeg, '__bytes__') else bytes(img_jpeg.bytearray())
+                                _thread.start_new_thread(upload_task, (jpg_data, SERVER_HOST, SERVER_PORT))
+                            except Exception as e:
+                                print("Snap Error:", e)
+                                is_uploading = False
 
-                        last_sent_time = sent_record.get(plate_str, 0)
-
-                        if (current_time - last_sent_time) > COOLDOWN_TIME:
-                            # 动作 A: 发串口给 ESP32
-                            msg = plate_str + "\n"
-                            uart.write(msg)
-                            print("[UART SENT] {}".format(plate_str))
-                             # 动作 B: 启动后台线程，通过 Socket 上传图片
-                            if not is_uploading:
-                                is_uploading = True # 加锁
-                                try:
-                                    # 1. 抓取正确的宽高维度 (此时 img 还是 3, H, W 的平面格式)
-                                    c, h, w = img.shape[0], img.shape[1], img.shape[2]
-
-                                    # 2.纯数学切片：将 CHW 平面彻底转换为 HWC 交织
-                                    # 利用底层 C 语言级别的一维数组赋值，极其快速且完美避开所有 Bug
-                                    r = img[0].flatten()
-                                    g = img[1].flatten()
-                                    b = img[2].flatten()
-
-                                    # 分配一块干净的内存
-                                    hwc = np.zeros(c * h * w, dtype=np.uint8)
-                                    # 交织写入 R, G, B
-                                    hwc[0::3] = r
-                                    hwc[1::3] = g
-                                    hwc[2::3] = b
-
-                                    # 3. 把这块纯净交织的内存，包装成标准 RGB888 照片
-                                    img_obj = image.Image(w, h, image.RGB888, data=hwc.tobytes())
-
-                                    # 4. 压缩为 JPEG 图片对象 (quality 取 40 速度和清晰度最佳)
-                                    img_jpeg = img_obj.compress(quality=40)
-
-                                    # 5. 提取二进制数据
-                                    try:
-                                        jpg_data = bytes(img_jpeg)
-                                    except:
-                                        jpg_data = bytes(img_jpeg.bytearray())
-
-                                    # 多线程调用上传
-                                    _thread.start_new_thread(upload_task, (jpg_data, SERVER_IP, SERVER_PORT))
-                                except Exception as e:
-                                    print(" -> [THREAD ERROR]", e)
-                                    is_uploading = False # 释放锁
-
-
-                            sent_record[plate_str] = current_time
-                        else:
-                            pass
-
-                gc.collect()
+                        sent_record[plate_str] = current_time
+            gc.collect()
     except Exception as e:
-        print("Error:", e) # 修复 f-string 错误
+        print("Error:", e)
     finally:
-        print("Deinit UART and Pipeline")
         uart.deinit()
-        lr.licence_det.deinit()
-        lr.licence_rec.deinit()
         pl.destroy()
