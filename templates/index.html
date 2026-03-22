@@ -8,67 +8,229 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background-color: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
-        .slot-card { transition: all 0.3s; border-radius: 15px; border-top: 5px solid transparent; }
+        body { background: #f3f6fa; font-family: "Segoe UI", sans-serif; }
+        .slot-card { border-radius: 14px; border-top: 4px solid transparent; }
         .status-free { border-top-color: #198754; }
-        .status-occupied { border-top-color: #dc3545; background-color: #fff5f5; }
-        .status-reserved { border-top-color: #0d6efd; background-color: #f0f7ff; } 
-        .charging-active { color: #ffc107; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        .chart-container { height: 220px; }
-        
-        .stat-box {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-            border: 1px solid #e9ecef;
+        .status-occupied { border-top-color: #dc3545; background: #fff7f7; }
+        .status-reserved { border-top-color: #0d6efd; background: #f4f8ff; }
+        .charging-bolt { color: #f59f00; animation: pulse 1.4s infinite; }
+        .kpi-box { background: #fff; border: 1px solid #e9ecef; border-radius: 12px; padding: 12px; text-align: center; }
+        .kpi-num { font-size: 1.3rem; font-weight: 700; }
+        .chart-area { height: 260px; }
+        .tiny { font-size: 0.82rem; }
+        .env-card {
+            border: none;
+            border-radius: 14px;
+            color: #fff;
+            background: linear-gradient(135deg, #0d6efd, #17a2b8);
+            box-shadow: 0 8px 20px rgba(13, 110, 253, 0.25);
+            position: relative;
+            overflow: hidden;
         }
-        .stat-number { font-size: 1.5rem; font-weight: bold; }
-        .text-green { color: #198754; }
-        .text-blue { color: #0d6efd; }
-        .text-orange { color: #ffc107; }
+        .env-card .card-body {
+            position: relative;
+            z-index: 1;
+        }
+        .env-value {
+            font-size: 1.7rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .env-unit { font-size: 0.9rem; opacity: 0.9; }
+        .env-badge {
+            font-size: 0.75rem;
+            letter-spacing: 0.02em;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            color: #fff;
+            border-radius: 999px;
+            padding: 4px 10px;
+        }
+        .env-logo-wrap {
+            position: absolute;
+            inset: 0;
+            margin: 0;
+            z-index: 0;
+        }
+        .env-logo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: none;
+            opacity: 0.5;
+        }
+        @media (max-width: 768px) {
+            .env-logo {
+                object-fit: contain;
+                object-position: center;
+            }
+        }
+        .calc-panel {
+            background: #f8fafc;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 8px 10px;
+        }
+        .calc-code {
+            font-family: "Consolas", "SFMono-Regular", monospace;
+            font-size: 0.76rem;
+            color: #495057;
+            white-space: pre-wrap;
+            line-height: 1.3;
+        }
+        .sim-summary-card {
+            border: 1px solid #e7edf6;
+            border-radius: 12px;
+            padding: 12px;
+            background: linear-gradient(180deg, #ffffff, #f8fbff);
+        }
+        .sim-summary-title {
+            font-size: 0.84rem;
+            color: #5b6572;
+            margin-bottom: 8px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+        .sim-kpi-tile {
+            background: #fff;
+            border: 1px solid #edf2f8;
+            border-radius: 10px;
+            padding: 8px 10px;
+        }
+        .sim-kpi-label {
+            font-size: 0.72rem;
+            color: #7a8492;
+            line-height: 1.15;
+        }
+        .sim-kpi-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-top: 3px;
+            line-height: 1.2;
+        }
+        .sim-model-box,
+        .sim-cap-box {
+            border: 1px solid #e7edf6;
+            border-radius: 12px;
+            background: #f9fbff;
+            padding: 10px 12px;
+        }
+        .sim-cap-chip {
+            border-radius: 999px;
+            padding: 3px 10px;
+            border: 1px solid #d8e4f6;
+            background: #ffffff;
+            font-size: 0.76rem;
+            color: #2f415c;
+        }
+        .sim-compare-table tbody tr:hover {
+            background: #f7fbff;
+        }
+        .sim-delta-good { color: #198754; font-weight: 700; }
+        .sim-delta-bad { color: #dc3545; font-weight: 700; }
+        .sim-delta-neutral { color: #6c757d; font-weight: 700; }
+        @keyframes pulse { 0% {opacity: 1;} 50% {opacity: 0.45;} 100% {opacity: 1;} }
     </style>
 </head>
 <body>
-
-<nav class="navbar navbar-dark bg-primary mb-4 shadow">
-    <div class="container"><span class="navbar-brand h1"><i class="fas fa-parking"></i> Smart Campus Parking System</span></div>
+<nav class="navbar navbar-dark bg-primary shadow-sm mb-3">
+    <div class="container">
+        <span class="navbar-brand mb-0 h1"><i class="fas fa-parking"></i> Smart Parking & Dynamic Charging Dashboard</span>
+    </div>
 </nav>
 
-<div class="container">
-    
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="card shadow-sm bg-info text-white border-0">
-                <div class="card-body d-flex justify-content-around align-items-center py-2">
-                    <h5 class="mb-0"><i class="fas fa-thermometer-half"></i> Temp: <span id="tempDisplay" class="fw-bold">--</span> °C</h5>
-                    <h5 class="mb-0"><i class="fas fa-tint"></i> Humidity: <span id="humDisplay" class="fw-bold">--</span> %</h5>
+<div class="container pb-4">
+    <div class="row g-3 mb-3">
+        <div class="col-lg-4">
+            <div class="card env-card h-100">
+                <div class="card-body d-flex flex-column justify-content-start">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0"><i class="fas fa-cloud-sun"></i> Environment</h6>
+                        <span class="env-badge" id="envStatus">Live</span>
+                    </div>
+                    <div class="row mb-auto">
+                        <div class="col-6 text-center">
+                            <div class="tiny"><i class="fas fa-thermometer-half"></i> Temp</div>
+                            <div class="env-value"><span id="tempDisplay">--</span><span class="env-unit">°C</span></div>
+                        </div>
+                        <div class="col-6 text-center">
+                            <div class="tiny"><i class="fas fa-tint"></i> Humidity</div>
+                            <div class="env-value"><span id="humDisplay">--</span><span class="env-unit">%</span></div>
+                        </div>
+                    </div>
+                    <div class="env-logo-wrap">
+                        <img src="{{ url_for('static', filename='bjtu_logo.jpg') }}?v={{ logo_version }}" alt="Beijing Jiaotong University" class="env-logo">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2"><i class="fas fa-sliders-h"></i> Dynamic SOC Policy</h6>
+                    <div>Occupancy: <b id="policyOccupancy">0%</b></div>
+                    <div>Current SOC cap: <b id="policyCap">100%</b></div>
+                    <div>Queue pressure: <b id="policyQueue">0%</b></div>
+                    <div>Next-hour forecast: <b id="policyNextHour">0</b></div>
+                    <div>Release in 45 min: <b id="policyRelease">0%</b></div>
+                    <div class="tiny text-muted mt-1">Cap levels: <b>100 / 90 / 80 / 70 / 60</b></div>
+                    <div class="tiny text-muted mt-1">Policy reason: <span id="policyReason">normal_load</span></div>
+                    <div class="calc-panel mt-2">
+                        <div class="tiny fw-bold text-secondary">Cap composition (live)</div>
+                        <div class="calc-code mt-1" id="policyComponentList">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-muted mb-0"><i class="fas fa-yen-sign"></i> Intelligent Pricing</h6>
+                        <button class="btn btn-outline-primary btn-sm" onclick="openPriceForecastModal()">
+                            <i class="fas fa-clock"></i> Next 8h Forecast
+                        </button>
+                    </div>
+                    <div class="d-flex align-items-end gap-2">
+                        <span class="display-6 fw-bold text-primary" id="priceNow">--</span>
+                        <span class="pb-2">CNY/kWh</span>
+                    </div>
+                    <div class="tiny text-muted">
+                        Current flow: <span id="priceCurrentFlow">--</span> |
+                        Historical flow: <span id="pricePredFlow">--</span> |
+                        Weighted: <span id="priceWeightedFlow">--</span>
+                    </div>
+                    <div class="tiny text-muted">Raw: <span id="priceRaw">--</span> | Smoothed: <span id="priceSmoothed">--</span></div>
+                    <div class="calc-panel mt-2">
+                        <div class="tiny fw-bold text-secondary" id="priceSummaryTitle">Total = Base + Demand + Forecast + Queue + Peak + Release + Discount</div>
+                        <div class="calc-code mt-1" id="priceComponentList">--</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-lg-5 mb-4">
+    <div class="row g-3 mb-3">
+        <div class="col-lg-5">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-white"><h5 class="mb-0">Reservation (Today Only)</h5></div>
+                <div class="card-header bg-white"><b>Reservation & Queue</b></div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">License Plate:</label>
+                        <label class="form-label fw-bold">Plate Number</label>
                         <div class="input-group">
-                            <select class="form-select bg-light" id="provinceSelect" style="max-width: 200px;">
+                            <select class="form-select bg-light" id="provinceSelect" style="max-width: 220px;">
                                 <option value="京">京 (Beijing)</option>
                                 <option value="津">津 (Tianjin)</option>
                                 <option value="冀">冀 (Hebei)</option>
                                 <option value="晋">晋 (Shanxi)</option>
-                                <option value="蒙">蒙 (Neimenggu)</option>
+                                <option value="蒙">蒙 (Inner Mongolia)</option>
                                 <option value="辽">辽 (Liaoning)</option>
                                 <option value="吉">吉 (Jilin)</option>
                                 <option value="黑">黑 (Heilongjiang)</option>
                                 <option value="沪">沪 (Shanghai)</option>
                                 <option value="苏">苏 (Jiangsu)</option>
-                                <option value="浙" selected>浙 (Zhejiang)</option>
+                                <option value="浙" selected>浙 (ZheJiang)</option>
                                 <option value="皖">皖 (Anhui)</option>
                                 <option value="闽">闽 (Fujian)</option>
                                 <option value="赣">赣 (Jiangxi)</option>
@@ -90,85 +252,188 @@
                                 <option value="宁">宁 (Ningxia)</option>
                                 <option value="新">新 (Xinjiang)</option>
                             </select>
-                            <select class="form-select bg-light" id="citySelect" style="max-width: 70px;">
+                            <select class="form-select bg-light" id="citySelect" style="max-width: 75px;">
                                 <option value="A">A</option><option value="B">B</option><option value="C">C</option>
                                 <option value="D">D</option><option value="E">E</option><option value="F">F</option>
                                 <option value="G">G</option><option value="H">H</option><option value="J">J</option>
                                 <option value="K">K</option><option value="L">L</option><option value="M">M</option>
+                                <option value="N">N</option><option value="P">P</option><option value="Q">Q</option>
+                                <option value="R">R</option><option value="S">S</option><option value="T">T</option>
+                                <option value="U">U</option><option value="V">V</option><option value="W">W</option>
+                                <option value="X">X</option><option value="Y">Y</option><option value="Z">Z</option>
                             </select>
-                            <input type="text" id="plateNumber" class="form-control" placeholder="88888">
+                            <input type="text" id="plateTailInput" class="form-control" placeholder="12345 / D1234" maxlength="6" inputmode="alphanumeric">
                         </div>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Start Time (Today):</label>
+                        <label class="form-label fw-bold">Planned Arrival Time (Today)</label>
                         <input type="time" id="startTimeInput" class="form-control">
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Duration Mode:</label>
-                        <div class="d-flex gap-3 mb-2">
-                            <div class="form-check"><input class="form-check-input" type="radio" name="resMode" id="modeDuration" checked onclick="toggleMode()"><label class="form-check-label" for="modeDuration">Duration</label></div>
-                            <div class="form-check"><input class="form-check-input" type="radio" name="resMode" id="modeEndTime" onclick="toggleMode()"><label class="form-check-label" for="modeEndTime">End Time</label></div>
-                        </div>
-                        <div id="durationInputs" class="row g-2">
-                            <div class="col-6"><div class="input-group"><input type="number" id="inputHours" class="form-control" value="1"><span class="input-group-text">Hrs</span></div></div>
-                            <div class="col-6"><div class="input-group"><input type="number" id="inputMinutes" class="form-control" value="0"><span class="input-group-text">Mins</span></div></div>
-                        </div>
-                        <div id="endTimeInputs" class="d-none"><input type="time" id="endTimeInput" class="form-control"></div>
+                        <label class="form-label fw-bold">Charging Preference (Decided at Reservation)</label>
+                        <select id="chargePolicySelect" class="form-select" onchange="toggleTimedOption()">
+                            <option value="auto">Auto Stop (charge until dynamic SOC cap)</option>
+                            <option value="timed">Timed Session</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="timedMinutesWrap" style="display:none;">
+                        <label class="form-label fw-bold">Timed Session Length</label>
+                        <select id="timedMinutesSelect" class="form-select">
+                            <option value="30">30 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="90">1.5 hours</option>
+                            <option value="120">2 hours</option>
+                        </select>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Select Slot & 4-Digit PIN:</label>
+                        <label class="form-label fw-bold">Slot & PIN</label>
                         <div class="input-group">
                             <select id="slotSelect" class="form-select">
                                 <option value="1">Slot #1</option><option value="2">Slot #2</option>
                                 <option value="3">Slot #3</option><option value="4">Slot #4</option>
                             </select>
-                            <input type="password" id="resPin" class="form-control" placeholder="Set PIN" maxlength="4" inputmode="numeric">
+                            <input type="password" id="resPin" class="form-control" placeholder="4-digit PIN" maxlength="4" inputmode="numeric">
                         </div>
-                        <small class="text-muted">PIN is required to cancel reservation later.</small>
                     </div>
-                    
-                    <button onclick="makeReservation()" class="btn btn-primary w-100">Confirm Reservation</button>
 
-<div class="text-center mt-2">
-    <small class="text-danger fw-bold">
-        <i class="fas fa-exclamation-circle"></i> Note: Reservations will be automatically canceled if you are 5 minutes late.
-    </small>
-</div>
+                    <button onclick="makeReservation()" class="btn btn-primary w-100">Create Reservation</button>
+                    <div class="tiny text-danger mt-2">
+                        <i class="fas fa-exclamation-circle"></i> Reservation will auto-cancel if no arrival within 5 minutes after planned arrival time.
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-7 mb-4">
+        <div class="col-lg-7">
             <div class="card shadow-sm h-100">
-                <div class="card-header bg-white"><h5 class="mb-0">Charging Activity & Overview</h5></div>
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <b>Real-time KPI</b>
+                    <button class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#cameraModal">
+                        <i class="fas fa-camera"></i> Snapshot History
+                    </button>
+                </div>
                 <div class="card-body">
-                    <div class="chart-container">
-                        <canvas id="chargingChart"></canvas>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted">Charging Sessions</div><div class="kpi-num text-primary" id="kpiCount">0</div></div></div>
+                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted">Avg Duration (min)</div><div class="kpi-num text-success" id="kpiDuration">0</div></div></div>
+                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted" id="kpiUtilLabel">Utilization (06:00-24:00)</div><div class="kpi-num text-warning" id="kpiUtil">0%</div></div></div>
+                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted">Avg Wait (min)</div><div class="kpi-num text-danger" id="kpiWait">0</div></div></div>
                     </div>
-                    
-                    <hr class="my-4">
-                    <h6 class="text-muted mb-3"><i class="fas fa-tachometer-alt"></i> Real-time Dashboard</h6>
-                    <div class="row g-3">
-                        <div class="col-4">
-                            <div class="stat-box">
-                                <div class="text-green stat-number" id="stat-available">0</div>
-                                <div class="small text-muted">Available</div>
-                            </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-4"><div class="kpi-box"><div class="tiny text-muted">Available Slots</div><div class="kpi-num" id="kpiAvailable">0</div></div></div>
+                        <div class="col-4"><div class="kpi-box"><div class="tiny text-muted">Charging Now</div><div class="kpi-num" id="kpiCharging">0</div></div></div>
+                        <div class="col-4"><div class="kpi-box"><div class="tiny text-muted">Queue Length</div><div class="kpi-num" id="kpiQueue">0</div></div></div>
+                    </div>
+                    <div class="chart-area">
+                        <canvas id="hourlyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><b>Live Slot Status & Charging Control</b></div>
+                <div class="card-body">
+                    <div class="row" id="slots-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <b>Historical Metrics</b>
+                    <select id="historyGroupSelect" class="form-select form-select-sm" style="width: 120px;">
+                        <option value="day" selected>By Day</option>
+                        <option value="month">By Month</option>
+                    </select>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="historyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><b>Queue Allocation</b></div>
+                <div class="card-body table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Plate</th>
+                            <th>Status</th>
+                            <th>Charging Preference</th>
+                            <th>Estimated Wait</th>
+                            <th>Assigned Slot</th>
+                            <th>Actual Wait</th>
+                            <th>Request Time</th>
+                        </tr>
+                        </thead>
+                        <tbody id="queueTableBody">
+                        <tr><td colspan="8" class="text-muted">No queue records.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-3">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><b>Simulation Lab (Baseline vs Optimized)</b></div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label tiny text-muted mb-1">Campus Slot Setting</label>
+                            <div class="form-control bg-light" id="simSlotsFixedDisplay"><b>Slot = 14</b> (Fixed)</div>
                         </div>
-                        <div class="col-4">
-                            <div class="stat-box">
-                                <div class="text-blue stat-number" id="stat-reserved">0</div>
-                                <div class="small text-muted">Reserved</div>
-                            </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label tiny text-muted mb-1">Simulation Days</label>
+                            <input type="number" id="simDaysInput" class="form-control" min="1" max="365" value="30">
                         </div>
-                        <div class="col-4">
-                            <div class="stat-box">
-                                <div class="text-orange stat-number" id="stat-charging">0</div>
-                                <div class="small text-muted">Charging</div>
-                            </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label tiny text-muted mb-1">Congestion Level</label>
+                            <select id="simDemandInput" class="form-select">
+                                <option value="1">Level 1 - Low</option>
+                                <option value="2" selected>Level 2 - Normal</option>
+                                <option value="3">Level 3 - High</option>
+                                <option value="4">Level 4 - Peak</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label tiny text-muted mb-1">Random Seed</label>
+                            <input type="number" id="simSeedInput" class="form-control" value="20260321">
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label tiny text-muted mb-1">Price Elasticity (e)</label>
+                            <input type="number" id="simElasticityInput" class="form-control" min="0" max="1.5" step="0.01" value="0.4">
+                        </div>
+                        <div class="col-12 tiny text-muted">
+                            <code>e</code> controls how sensitive demand is to price: larger <code>e</code> means high prices defer more users and low prices attract more users.
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <button id="runSimulationBtn" class="btn btn-primary w-100" onclick="runSimulation()">
+                                <i class="fas fa-vial"></i> Run Simulation
+                            </button>
+                        </div>
+                        <div class="col-12 col-md-8 tiny text-muted" id="simRunStatus">
+                            Configure days, congestion level, and elasticity, then run the simulation.
                         </div>
                     </div>
                 </div>
@@ -176,241 +441,956 @@
         </div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Live Status</h4>
-        <button class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#cameraModal">
-            <i class="fas fa-camera"></i> Live Snapshot
-        </button>
-    </div>
-
-    <div class="row" id="slots-container"></div>
-    
-    <footer class="mt-5 mb-4 text-center text-secondary">
-        <p class="mb-1 fw-bold">Beijing Jiaotong University / Lancaster University</p>
-        <p class="small">Graduation Project: Communication Engineering | Designed by Yangliwei</p>
+    <footer class="mt-4 text-center text-secondary tiny">
+        Beijing Jiaotong University / Lancaster University
     </footer>
 </div>
 
-<div class="modal fade" id="cameraModal" tabindex="-1" aria-labelledby="cameraModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content bg-dark border-0">
-      <div class="modal-header border-secondary text-light">
-        <h5 class="modal-title" id="cameraModalLabel"><i class="fas fa-camera text-info"></i> Snapshot History</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      
-      <div class="modal-body p-3" id="snapshot-container" style="background-color: #121212;">
-          <p class="text-center text-secondary my-4"><i class="fas fa-spinner fa-spin"></i> Loading snapshots...</p>
-      </div>
-      
+<div class="modal fade" id="cameraModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content bg-dark border-0">
+            <div class="modal-header border-secondary text-light">
+                <h5 class="modal-title"><i class="fas fa-camera text-info"></i> Snapshot History</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3" id="snapshot-container" style="background-color: #121212;">
+                <p class="text-center text-secondary my-4"><i class="fas fa-spinner fa-spin"></i> Loading snapshots...</p>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+<div class="modal fade" id="curveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-chart-line text-primary"></i> Slot Charging Curve</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div id="curveSlotLabel" class="text-muted tiny">No slot selected</div>
+                    <div id="curveHint" class="text-muted tiny"></div>
+                </div>
+                <div class="chart-area">
+                    <canvas id="curveChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="priceForecastModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-coins text-warning"></i> Predicted Charging Price (Next 8 Hours)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="tiny text-muted mb-2">Generated at: <span id="forecastGeneratedAt">--</span></div>
+                <div class="tiny text-muted mb-2" id="forecastBasis">Basis: --</div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Time</th>
+                            <th>Predicted Price</th>
+                            <th>Demand Level</th>
+                            <th>Peak</th>
+                        </tr>
+                        </thead>
+                        <tbody id="priceForecastBody">
+                        <tr><td colspan="5" class="text-muted">No forecast yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="simulationResultModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-balance-scale text-primary"></i> Simulation Comparison Result</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="tiny text-muted mb-1">Generated at: <span id="simGeneratedAt">--</span></div>
+                <div class="tiny text-muted mb-2" id="simConfigText">Config: --</div>
+                <div class="row g-3 mb-3">
+                    <div class="col-lg-6">
+                        <div class="sim-summary-card h-100">
+                            <div class="sim-summary-title"><i class="fas fa-circle text-secondary"></i> Baseline</div>
+                            <div class="row g-2" id="simBaselineKpiGrid"></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="sim-summary-card h-100">
+                            <div class="sim-summary-title"><i class="fas fa-circle text-primary"></i> Optimized</div>
+                            <div class="row g-2" id="simOptimizedKpiGrid"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="sim-model-box mb-3">
+                    <div class="tiny fw-bold text-secondary mb-1">Demand Response Model</div>
+                    <div class="tiny text-muted" id="simModelText">--</div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <div class="sim-cap-box h-100">
+                            <div class="tiny fw-bold text-secondary mb-1">Baseline SOC Cap Distribution</div>
+                            <div class="d-flex flex-wrap gap-2" id="simCapDistBaseline">--</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="sim-cap-box h-100">
+                            <div class="tiny fw-bold text-secondary mb-1">Optimized SOC Cap Distribution</div>
+                            <div class="d-flex flex-wrap gap-2" id="simCapDistOptimized">--</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="sim-cap-box mb-3">
+                    <div class="tiny fw-bold text-secondary mb-1">Charging Start Time Distribution (Baseline vs Optimized)</div>
+                    <div class="chart-area" style="height: 240px;">
+                        <canvas id="simTimeDistributionChart"></canvas>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle sim-compare-table">
+                        <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Baseline</th>
+                            <th>Optimized</th>
+                            <th>Delta</th>
+                            <th>Delta %</th>
+                        </tr>
+                        </thead>
+                        <tbody id="simCompareTableBody">
+                        <tr><td colspan="5" class="text-muted">No simulation result yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // --- 初始化默认时间为当前时间的 HH:mm ---
+    let latestSlots = [];
+    let selectedCurveSlotId = null;
+    let curveModal = null;
+    let priceForecastModal = null;
+    let simulationResultModal = null;
+    let simTimeDistributionChart = null;
+
     function setDefaultTime() {
         const now = new Date();
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('startTimeInput').value = `${hours}:${minutes}`;
+        const h = String(now.getHours()).padStart(2, "0");
+        const m = String(now.getMinutes()).padStart(2, "0");
+        document.getElementById("startTimeInput").value = `${h}:${m}`;
     }
     setDefaultTime();
 
-    function toggleMode() {
-        const isDuration = document.getElementById('modeDuration').checked;
-        document.getElementById('durationInputs').classList.toggle('d-none', !isDuration);
-        document.getElementById('endTimeInputs').classList.toggle('d-none', isDuration);
+    function toggleTimedOption() {
+        const selected = document.getElementById("chargePolicySelect").value;
+        document.getElementById("timedMinutesWrap").style.display = selected === "timed" ? "block" : "none";
     }
 
-    // --- Chart.js ---
-    const ctx = document.getElementById('chargingChart').getContext('2d');
-    const chargingChart = new Chart(ctx, {
-        type: 'bar',
+    function getFullTimestamp(timeStr) {
+        if (!timeStr) return null;
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}T${timeStr}`;
+    }
+
+    function fmtPct(value) {
+        const num = Number(value);
+        if (Number.isNaN(num)) return "--";
+        return `${(num * 100).toFixed(1)}%`;
+    }
+
+    function fmtComponentValue(value) {
+        const num = Number(value);
+        if (Number.isNaN(num)) return "--";
+        if (Math.abs(num) <= 1) return `${(num * 100).toFixed(1)}%`;
+        return num.toFixed(2);
+    }
+
+    function fmtSignedAmount(value) {
+        const num = Number(value);
+        if (Number.isNaN(num)) return "--";
+        if (num > 0) return `+${num.toFixed(2)}`;
+        return num.toFixed(2);
+    }
+
+    function renderPolicyComponentList(targetId, components, fallback = "--") {
+        const el = document.getElementById(targetId);
+        if (!el) return;
+        if (!Array.isArray(components) || !components.length) {
+            el.innerText = fallback;
+            return;
+        }
+        const lines = components.map(item => {
+            const name = item.name || "Component";
+            const value = fmtComponentValue(item.value);
+            return `${name} ${value}`;
+        });
+        el.innerText = lines.join(" | ");
+    }
+
+    function renderPricingComponentList(targetId, components, totalPrice, fallback = "--") {
+        const el = document.getElementById(targetId);
+        if (!el) return;
+        if (!Array.isArray(components) || !components.length) {
+            el.innerText = fallback;
+            return;
+        }
+        const parts = components.map(item => `${item.name} ${fmtSignedAmount(item.amount)}`);
+        el.innerText = `${parts.join(" | ")} | Total ${Number(totalPrice || 0).toFixed(2)} CNY/kWh`;
+    }
+
+    function renderPolicyDetails(policy) {
+        if (!policy) return;
+        document.getElementById("policyOccupancy").innerText = `${Number(policy.occupancy_ratio || 0).toFixed(1)}%`;
+        document.getElementById("policyCap").innerText = `${policy.recommended_cap || 100}%`;
+        document.getElementById("policyNextHour").innerText = fmtPct(policy.next_hour_predicted_flow || 0);
+        document.getElementById("policyReason").innerText = policy.reason || "normal_load";
+        document.getElementById("policyQueue").innerText = fmtPct(policy.queue_ratio || 0);
+        document.getElementById("policyRelease").innerText = fmtPct(policy.release_ratio || 0);
+        const calc = policy.calculation || {};
+        renderPolicyComponentList("policyComponentList", calc.components, "No policy component data");
+    }
+
+    function renderPricingDetails(pricing) {
+        if (!pricing) return;
+        document.getElementById("priceNow").innerText = Number(pricing.price_per_kwh || 0).toFixed(2);
+        document.getElementById("priceCurrentFlow").innerText = fmtPct(pricing.current_flow || 0);
+        document.getElementById("pricePredFlow").innerText = fmtPct(pricing.predicted_flow || 0);
+        document.getElementById("priceWeightedFlow").innerText = fmtPct(pricing.weighted_flow || 0);
+        document.getElementById("priceRaw").innerText = Number(pricing.raw_price_per_kwh || pricing.price_per_kwh || 0).toFixed(2);
+        document.getElementById("priceSmoothed").innerText = Number(pricing.smoothed_price_per_kwh || pricing.price_per_kwh || 0).toFixed(2);
+        if (pricing.summary_text) {
+            document.getElementById("priceSummaryTitle").innerText = pricing.summary_text;
+        }
+        renderPricingComponentList("priceComponentList", pricing.components, pricing.price_per_kwh, "No pricing component data");
+    }
+
+    const hourlyChart = new Chart(document.getElementById("hourlyChart").getContext("2d"), {
+        type: "bar",
         data: {
-            labels: Array.from({length: 24}, (_, i) => i + ":00"),
-            datasets: [{ label: 'Charging Sessions', data: [], backgroundColor: 'rgba(13, 110, 253, 0.7)', borderRadius: 4 }]
+            labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+            datasets: [{
+                label: "Charging Sessions per Hour",
+                data: [],
+                backgroundColor: "rgba(13, 110, 253, 0.65)",
+                borderRadius: 4
+            }]
         },
-        options: { 
-            responsive: true, 
+        options: {
+            responsive: true,
             maintainAspectRatio: false,
             scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
         }
     });
 
-    // --- 辅助函数：拼接今天日期 ---
-    function getFullTimestamp(timeStr) {
-        if (!timeStr) return null;
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}T${timeStr}`;
+    const curveChart = new Chart(document.getElementById("curveChart").getContext("2d"), {
+        type: "line",
+        data: { labels: [], datasets: [] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            scales: {
+                y: { min: 0, max: 100, title: { display: true, text: "SOC (%)" } },
+                x: { title: { display: true, text: "Charging time (minutes)" } }
+            }
+        }
+    });
+
+    const historyChart = new Chart(document.getElementById("historyChart").getContext("2d"), {
+        data: {
+            labels: [],
+            datasets: [
+                { type: "bar", label: "Charging Sessions", data: [], yAxisID: "y", backgroundColor: "rgba(25, 135, 84, 0.55)" },
+                { type: "line", label: "Avg Duration (min)", data: [], yAxisID: "y", borderColor: "#0d6efd", backgroundColor: "rgba(13, 110, 253, 0.2)", tension: 0.25 },
+                { type: "line", label: "Utilization (%)", data: [], yAxisID: "y1", borderColor: "#fd7e14", backgroundColor: "rgba(253, 126, 20, 0.2)", tension: 0.25 },
+                { type: "line", label: "Avg Wait (min)", data: [], yAxisID: "y", borderColor: "#dc3545", backgroundColor: "rgba(220, 53, 69, 0.2)", tension: 0.25 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            scales: {
+                y: { beginAtZero: true, position: "left" },
+                y1: { beginAtZero: true, position: "right", min: 0, max: 100, grid: { drawOnChartArea: false } }
+            }
+        }
+    });
+
+    function renderSimulationTimeDistribution(payload) {
+        const labels = Array.from({length: 24}, (_, i) => `${i}:00`);
+        const baselineDist = (payload.baseline && payload.baseline.start_hour_distribution) || {};
+        const optimizedDist = (payload.optimized && payload.optimized.start_hour_distribution) || {};
+        const baselineData = labels.map((_, i) => Number(baselineDist[String(i)] || 0));
+        const optimizedData = labels.map((_, i) => Number(optimizedDist[String(i)] || 0));
+
+        if (!simTimeDistributionChart) {
+            simTimeDistributionChart = new Chart(document.getElementById("simTimeDistributionChart").getContext("2d"), {
+                type: "bar",
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: "Baseline",
+                            data: baselineData,
+                            backgroundColor: "rgba(108, 117, 125, 0.70)",
+                            borderRadius: 4
+                        },
+                        {
+                            label: "Optimized",
+                            data: optimizedData,
+                            backgroundColor: "rgba(13, 110, 253, 0.70)",
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0 } }
+                    }
+                }
+            });
+            return;
+        }
+
+        simTimeDistributionChart.data.labels = labels;
+        simTimeDistributionChart.data.datasets[0].data = baselineData;
+        simTimeDistributionChart.data.datasets[1].data = optimizedData;
+        simTimeDistributionChart.update();
     }
 
-    // --- 核心业务逻辑 ---
     function makeReservation() {
-        const pin = document.getElementById('resPin').value;
-        const number = document.getElementById('plateNumber').value.trim();
-        const startTimeVal = document.getElementById('startTimeInput').value;
-        
-        if(!number || pin.length !== 4) { alert("Please enter plate and 4-digit PIN!"); return; }
-        if(!startTimeVal) { alert("Please select a start time!"); return; }
+        const pin = document.getElementById("resPin").value.trim();
+        const plateTail = document.getElementById("plateTailInput").value.trim().toUpperCase();
+        const plate = `${document.getElementById("provinceSelect").value}${document.getElementById("citySelect").value}${plateTail}`;
+        const startTimeVal = document.getElementById("startTimeInput").value;
+        const chargePolicy = document.getElementById("chargePolicySelect").value;
+        const chargeMinutes = Number(document.getElementById("timedMinutesSelect").value);
 
-        const fullStartTime = getFullTimestamp(startTimeVal);
-        let fullEndTime = null;
-
-        if (document.getElementById('modeEndTime').checked) {
-            const endTimeVal = document.getElementById('endTimeInput').value;
-            if(!endTimeVal) { alert("Please select an end time!"); return; }
-            fullEndTime = getFullTimestamp(endTimeVal);
+        if (!plateTail || pin.length !== 4) {
+            alert("Please complete the Chinese plate input and enter a valid 4-digit PIN.");
+            return;
+        }
+        if (!startTimeVal) {
+            alert("Please select an arrival time.");
+            return;
         }
 
         const payload = {
-            id: document.getElementById('slotSelect').value,
-            plate: document.getElementById('provinceSelect').value + document.getElementById('citySelect').value + number.toUpperCase(),
-            startTime: fullStartTime, 
+            id: document.getElementById("slotSelect").value,
+            plate: plate,
+            startTime: getFullTimestamp(startTimeVal),
             pin: pin,
-            mode: document.getElementById('modeDuration').checked ? 'duration' : 'endtime',
-            hours: document.getElementById('inputHours').value,
-            minutes: document.getElementById('inputMinutes').value,
-            endTime: fullEndTime,     
-            action: 'reserve'
+            chargePolicy: chargePolicy,
+            chargeMinutes: chargePolicy === "timed" ? chargeMinutes : null,
+            action: "reserve"
         };
 
-        fetch('/api/reserve', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+        fetch("/api/reserve", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
             body: JSON.stringify(payload)
         }).then(res => res.json()).then(data => {
             alert(data.message);
-            if(data.success) {
-                fetchStatus();
-                document.getElementById('resPin').value = ''; 
-            }
-        });
+            if (data.success) document.getElementById("resPin").value = "";
+            fetchStatus();
+            fetchQueue();
+            fetchKpi();
+        }).catch(() => alert("Reservation request failed."));
     }
 
     function cancelReservation(slotId) {
-        const userPin = prompt("Enter 4-digit PIN to cancel:");
+        const userPin = prompt("Enter the 4-digit PIN to cancel this reservation:");
         if (userPin === null) return;
-
-        fetch('/api/reserve', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ id: slotId, action: 'cancel', pin: userPin })
+        fetch("/api/reserve", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ id: slotId, action: "cancel", pin: userPin.trim() })
         }).then(res => res.json()).then(data => {
-            if(!data.success) alert(data.message);
+            if (!data.success) alert(data.message);
             fetchStatus();
+            fetchQueue();
+            fetchKpi();
         });
+    }
+
+    function openCurveModal(slotId) {
+        selectedCurveSlotId = slotId;
+        renderCurveChart();
+        if (!curveModal) {
+            curveModal = new bootstrap.Modal(document.getElementById("curveModal"));
+        }
+        curveModal.show();
+    }
+
+    function openPriceForecastModal() {
+        if (!priceForecastModal) {
+            priceForecastModal = new bootstrap.Modal(document.getElementById("priceForecastModal"));
+        }
+        document.getElementById("priceForecastBody").innerHTML = '<tr><td colspan="5" class="text-muted">Loading forecast...</td></tr>';
+        document.getElementById("forecastGeneratedAt").innerText = "--";
+        document.getElementById("forecastBasis").innerText = "Basis: --";
+        fetchPriceForecast();
+        priceForecastModal.show();
+    }
+
+    function fetchPriceForecast() {
+        fetch("/api/price_forecast?hours=8").then(res => res.json()).then(data => {
+            document.getElementById("forecastGeneratedAt").innerText = data.generated_at || "--";
+            document.getElementById("forecastBasis").innerText = `Basis: ${data.basis || "--"}`;
+            const body = document.getElementById("priceForecastBody");
+            const rows = data.forecast || [];
+            if (!rows.length) {
+                body.innerHTML = '<tr><td colspan="5" class="text-muted">No forecast data.</td></tr>';
+                return;
+            }
+            body.innerHTML = "";
+            rows.forEach(item => {
+                const peakBadge = item.is_peak
+                    ? '<span class="badge bg-danger">Peak</span>'
+                    : '<span class="badge bg-secondary">Normal</span>';
+                body.innerHTML += `
+                    <tr>
+                        <td>${item.hour_offset}</td>
+                        <td>${item.time_label}</td>
+                        <td><b>${Number(item.price_per_kwh).toFixed(2)} CNY/kWh</b></td>
+                        <td>${fmtPct(item.demand_level || 0)}</td>
+                        <td>${peakBadge}</td>
+                    </tr>`;
+            });
+        }).catch(() => {
+            document.getElementById("priceForecastBody").innerHTML = '<tr><td colspan="5" class="text-danger">Failed to load forecast.</td></tr>';
+        });
+    }
+
+    function fmtNum(value, digits = 2) {
+        const n = Number(value);
+        if (Number.isNaN(n)) return "--";
+        return n.toFixed(digits);
+    }
+
+    function fmtSigned(value, digits = 2) {
+        const n = Number(value);
+        if (Number.isNaN(n)) return "--";
+        if (n > 0) return `+${n.toFixed(digits)}`;
+        return n.toFixed(digits);
+    }
+
+    const SIM_DIRECTION = {
+        "Charging Sessions": 1,
+        "Demand Served Ratio (%)": 1,
+        "Price-driven Deferrals": -1,
+        "Price-driven Attraction": 1,
+        "Avg Duration (min)": -1,
+        "Avg Wait (min)": -1,
+        "P95 Wait (min)": -1,
+        "Queue Hit Rate (%)": -1,
+        "Time Utilization (%)": 1,
+        "Avg Price (CNY/kWh)": 0,
+        "Avg Peak Price (CNY/kWh)": 1,
+        "Avg Off-peak Price (CNY/kWh)": -1,
+        "Total Energy (kWh)": 1,
+        "Total Revenue (CNY)": 1,
+        "Avg Final SOC (%)": 1
+    };
+
+    const SIM_KPI_TILES = [
+        { key: "charging_count", label: "Sessions", format: v => fmtNum(v, 0) },
+        { key: "served_ratio_pct", label: "Served Ratio", format: v => `${fmtNum(v, 2)}%` },
+        { key: "avg_wait_minutes", label: "Avg Wait", format: v => `${fmtNum(v, 2)} min` },
+        { key: "time_utilization_pct", label: "Time Utilization", format: v => `${fmtNum(v, 2)}%` },
+        { key: "avg_price_cny_per_kwh", label: "Avg Price", format: v => `${fmtNum(v, 2)} CNY/kWh` },
+        { key: "total_revenue_cny", label: "Revenue", format: v => `${fmtNum(v, 2)} CNY` }
+    ];
+
+    function formatSimMetricValue(metric, value) {
+        if (metric.includes("Ratio (%)") || metric.includes("Rate (%)") || metric.includes("SOC (%)") || metric.includes("Utilization (%)")) {
+            return `${fmtNum(value, 2)}%`;
+        }
+        if (metric.includes("(min)")) {
+            return `${fmtNum(value, 2)} min`;
+        }
+        if (metric.includes("(CNY/kWh)")) {
+            return `${fmtNum(value, 2)} CNY/kWh`;
+        }
+        if (metric.includes("(CNY)")) {
+            return `${fmtNum(value, 2)} CNY`;
+        }
+        if (metric.includes("(kWh)")) {
+            return `${fmtNum(value, 2)} kWh`;
+        }
+        if (metric.includes("Sessions") || metric.includes("Deferrals")) {
+            return fmtNum(value, 0);
+        }
+        return fmtNum(value, 2);
+    }
+
+    function getSimulationDeltaClass(metric, delta) {
+        const direction = SIM_DIRECTION[metric] ?? 0;
+        const d = Number(delta || 0);
+        if (Math.abs(d) < 1e-9 || direction === 0) return "sim-delta-neutral";
+        const isGood = (direction > 0 && d > 0) || (direction < 0 && d < 0);
+        return isGood ? "sim-delta-good" : "sim-delta-bad";
+    }
+
+    function renderSimulationKpiTiles(targetId, data) {
+        const root = document.getElementById(targetId);
+        if (!root) return;
+        root.innerHTML = "";
+        SIM_KPI_TILES.forEach(item => {
+            const raw = data ? data[item.key] : null;
+            root.innerHTML += `
+                <div class="col-6">
+                    <div class="sim-kpi-tile h-100">
+                        <div class="sim-kpi-label">${item.label}</div>
+                        <div class="sim-kpi-value">${raw === null || raw === undefined ? "--" : item.format(raw)}</div>
+                    </div>
+                </div>`;
+        });
+    }
+
+    function renderCapDistribution(targetId, capDist) {
+        const root = document.getElementById(targetId);
+        if (!root) return;
+        const entries = Object.entries(capDist || {})
+            .map(([cap, cnt]) => [Number(cap), Number(cnt || 0)])
+            .filter(([cap]) => Number.isFinite(cap))
+            .sort((a, b) => a[0] - b[0]);
+        if (!entries.length) {
+            root.innerHTML = '<span class="tiny text-muted">No records</span>';
+            return;
+        }
+        root.innerHTML = entries
+            .map(([cap, cnt]) => `<span class="sim-cap-chip">${cap}%: <b>${cnt}</b></span>`)
+            .join("");
+    }
+
+    function renderSimulationResult(payload) {
+        document.getElementById("simGeneratedAt").innerText = payload.generated_at || "--";
+        const cfg = payload.config || {};
+        const model = payload.model || {};
+        document.getElementById("simConfigText").innerText =
+            `Config: slots=${cfg.slots ?? "--"}, days=${cfg.days ?? "--"}, congestion_level=${cfg.demand_scale ?? "--"}, seed=${cfg.seed ?? "--"}, elasticity(e)=${fmtNum(cfg.price_elasticity ?? model.price_elasticity_e ?? 0.4, 2)}`;
+        document.getElementById("simModelText").innerText =
+            `Price-demand model: high price suppresses demand (floor ${fmtNum((model.min_accept_rate || 0.50) * 100, 0)}%), low-load discount attracts extra demand (max pull probability ${fmtNum((model.max_attraction_probability || 0.36) * 100, 0)}%). Target: peak above baseline, off-peak below baseline. Utilization window: ${model.utilization_window || "06:00-24:00"}. Current e=${fmtNum(model.price_elasticity_e ?? cfg.price_elasticity ?? 0.4, 2)}, P0=${fmtNum(model.base_price_p0 || 1.20, 2)} CNY/kWh.`;
+
+        renderSimulationKpiTiles("simBaselineKpiGrid", payload.baseline || {});
+        renderSimulationKpiTiles("simOptimizedKpiGrid", payload.optimized || {});
+        renderCapDistribution("simCapDistBaseline", payload.baseline ? payload.baseline.cap_distribution : {});
+        renderCapDistribution("simCapDistOptimized", payload.optimized ? payload.optimized.cap_distribution : {});
+        renderSimulationTimeDistribution(payload);
+
+        const rows = payload.comparison || [];
+        const body = document.getElementById("simCompareTableBody");
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="5" class="text-muted">No comparison rows.</td></tr>';
+        } else {
+            body.innerHTML = "";
+            rows.forEach(row => {
+                const cls = getSimulationDeltaClass(row.metric || "", row.delta);
+                body.innerHTML += `
+                    <tr>
+                        <td>${row.metric || "--"}</td>
+                        <td>${formatSimMetricValue(row.metric || "", row.baseline)}</td>
+                        <td>${formatSimMetricValue(row.metric || "", row.optimized)}</td>
+                        <td class="${cls}">${fmtSigned(row.delta, 2)}</td>
+                        <td class="${cls}"><b>${fmtSigned(row.delta_pct, 2)}%</b></td>
+                    </tr>`;
+            });
+        }
+    }
+
+    function runSimulation() {
+        const btn = document.getElementById("runSimulationBtn");
+        const status = document.getElementById("simRunStatus");
+
+        const slots = 14;
+        const days = Number(document.getElementById("simDaysInput").value);
+        const demandScale = Number(document.getElementById("simDemandInput").value);
+        const seed = Number(document.getElementById("simSeedInput").value);
+        const elasticity = Number(document.getElementById("simElasticityInput").value);
+
+        if (!Number.isFinite(slots) || slots < 1 || !Number.isFinite(days) || days < 1 || !Number.isFinite(demandScale) || demandScale < 1 || demandScale > 4 || !Number.isFinite(elasticity) || elasticity < 0) {
+            alert("Please enter valid simulation parameters.");
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+        status.innerText = "Simulation running, please wait...";
+
+        fetch("/api/simulate_compare", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                slots: Math.round(slots),
+                days: Math.round(days),
+                demand_scale: demandScale,
+                seed: Number.isFinite(seed) ? Math.round(seed) : 20260321,
+                price_elasticity: elasticity
+            })
+        }).then(res => res.json()).then(data => {
+            if (!data.success) {
+                alert(data.message || "Simulation failed");
+                status.innerText = "Simulation failed. Check parameters and try again.";
+                return;
+            }
+            renderSimulationResult(data);
+            status.innerText = "Simulation completed. Results are ready.";
+            if (!simulationResultModal) {
+                simulationResultModal = new bootstrap.Modal(document.getElementById("simulationResultModal"));
+            }
+            simulationResultModal.show();
+        }).catch(() => {
+            alert("Simulation request failed.");
+            status.innerText = "Simulation request failed.";
+        }).finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-vial"></i> Run Simulation';
+        });
+    }
+
+    function renderSlots(slots) {
+        const container = document.getElementById("slots-container");
+        container.innerHTML = "";
+
+        slots.forEach(slot => {
+            const statusClass = slot.occupied ? "status-occupied" : (slot.license_plate ? "status-reserved" : "status-free");
+            const statusText = slot.charging ? "Charging" : (slot.occupied ? "Occupied" : (slot.license_plate ? "Reserved" : "Available"));
+            const socText = slot.soc !== null ? `${slot.soc.toFixed(1)}%` : "--";
+            const charge = slot.charge_detail;
+            const hasCharge = !!charge;
+
+            const capSoc = hasCharge ? charge.cap_soc : "--";
+            const targetSoc = hasCharge ? charge.target_soc.toFixed(1) : "--";
+            const remainText = hasCharge ? `${charge.remaining_minutes.toFixed(1)} min` : "--";
+            const priceText = hasCharge ? `${charge.unit_price.toFixed(2)} CNY/kWh` : "--";
+            const progressVal = slot.soc !== null ? Math.max(0, Math.min(100, slot.soc)) : 0;
+
+            const prefText = slot.preferred_charge_mode === "timed"
+                ? `Timed ${slot.preferred_charge_minutes || 30} min`
+                : (slot.preferred_charge_mode === "auto" ? "Auto Stop" : "Not set");
+
+            const reserveInfo = slot.license_plate
+                ? `<div class="tiny text-primary mt-1"><b>${slot.license_plate}</b><br>${(slot.start_time || "").slice(11,16)} - ${(slot.end_time || "").slice(11,16)}<br>Preference: ${prefText}</div>`
+                : `<div class="tiny text-muted mt-1">No reservation</div>`;
+
+            const cancelBtn = slot.license_plate && !slot.occupied
+                ? `<button class="btn btn-sm btn-outline-danger w-100 mt-2" onclick="cancelReservation(${slot.id})">Cancel Reservation</button>`
+                : "";
+
+            const remainingInfo = hasCharge
+                ? `<div class="tiny text-success mt-1"><b>Estimated remaining time: ${remainText}</b></div>`
+                : "";
+
+            container.innerHTML += `
+            <div class="col-md-6 col-xl-3 mb-3">
+                <div class="card slot-card ${statusClass} shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Slot #${slot.id}</h6>
+                            <span class="badge ${slot.charging ? "bg-warning text-dark" : "bg-secondary"}">${statusText}</span>
+                        </div>
+                        <div class="my-2 text-center">${slot.charging ? '<i class="fas fa-bolt fa-lg charging-bolt"></i>' : '<i class="fas fa-plug text-muted"></i>'}</div>
+                        ${reserveInfo}
+
+                        <div class="mt-2 tiny">SOC: <b>${socText}</b> | Cap: <b>${capSoc}%</b> | Target: <b>${targetSoc}%</b></div>
+                        <div class="progress mt-1" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width:${progressVal}%"></div>
+                        </div>
+                        <div class="tiny text-muted mt-1">Price: ${priceText}</div>
+                        ${remainingInfo}
+
+                        <div class="row g-1 mt-2">
+                            <div class="col-6">
+                                ${slot.charging
+                                    ? ``
+                                    : ``}
+                            </div>
+                            <div class="col-6">
+                                <button class="btn btn-sm btn-outline-dark w-100" onclick="openCurveModal(${slot.id})">Show Curve</button>
+                            </div>
+                        </div>
+                        ${cancelBtn}
+                    </div>
+                </div>
+            </div>`;
+        });
+    }
+
+    function renderCurveChart() {
+        if (!selectedCurveSlotId) {
+            document.getElementById("curveSlotLabel").innerText = "No slot selected";
+            document.getElementById("curveHint").innerText = "";
+            curveChart.data.labels = [];
+            curveChart.data.datasets = [];
+            curveChart.update("none");
+            return;
+        }
+
+        const slot = latestSlots.find(s => s.id === selectedCurveSlotId);
+        if (!slot || !slot.charge_detail) {
+            document.getElementById("curveSlotLabel").innerText = `Slot #${selectedCurveSlotId} is not charging`;
+            document.getElementById("curveHint").innerText = "Curve appears after ESP32 starts charging.";
+            curveChart.data.labels = [];
+            curveChart.data.datasets = [];
+            curveChart.update("none");
+            return;
+        }
+
+        const detail = slot.charge_detail;
+        const modeLabel = detail.mode === "auto" ? "Auto Stop" : `Timed ${detail.manual_minutes || ""} min`;
+        document.getElementById("curveSlotLabel").innerText = `Slot #${slot.id} | ${modeLabel}`;
+        document.getElementById("curveHint").innerText = `Estimated remaining: ${detail.remaining_minutes.toFixed(1)} min`;
+
+        const planned = (detail.planned_curve || [])
+            .map(p => ({ minute: Number(p.minute), soc: p.soc === null || p.soc === undefined ? null : Number(p.soc) }))
+            .filter(p => !Number.isNaN(p.minute))
+            .sort((a, b) => a.minute - b.minute);
+        const actual = (detail.actual_curve || [])
+            .map(p => ({ minute: Number(p.minute), soc: p.soc === null || p.soc === undefined ? null : Number(p.soc) }))
+            .filter(p => !Number.isNaN(p.minute))
+            .sort((a, b) => a.minute - b.minute);
+
+        if (!planned.length) {
+            curveChart.data.labels = [];
+            curveChart.data.datasets = [];
+            curveChart.update("none");
+            return;
+        }
+
+        const gridMinutes = planned.map(p => p.minute);
+        const plannedData = planned.map(p => p.soc);
+        const actualData = new Array(gridMinutes.length).fill(null);
+
+        const floorGridIndex = (minute) => {
+            let idx = 0;
+            for (let i = 0; i < gridMinutes.length; i++) {
+                if (gridMinutes[i] <= minute) {
+                    idx = i;
+                } else {
+                    break;
+                }
+            }
+            return idx;
+        };
+
+        actual.forEach(p => {
+            if (p.soc === null || Number.isNaN(p.soc)) return;
+            const idx = floorGridIndex(p.minute);
+            actualData[idx] = p.soc;
+        });
+
+        curveChart.data.labels = gridMinutes.map(m => `${Number(m).toFixed(1)}m`);
+        curveChart.data.datasets = [
+            {
+                label: "Planned Curve",
+                data: plannedData,
+                borderColor: "#6c757d",
+                borderDash: [6, 4],
+                pointRadius: 0,
+                tension: 0.2
+            },
+            {
+                label: "Real-time Curve",
+                data: actualData,
+                borderColor: "#198754",
+                backgroundColor: "rgba(25, 135, 84, 0.2)",
+                pointRadius: 2,
+                tension: 0.2
+            }
+        ];
+        curveChart.update("none");
     }
 
     function fetchStatus() {
-        fetch('/api/status').then(res => res.json()).then(data => {
-            const container = document.getElementById('slots-container');
-            container.innerHTML = ''; 
-            
-            let availableCount = 0;
-            let reservedCount = 0;
-            let chargingCount = 0;
+        fetch("/api/status").then(res => res.json()).then(payload => {
+            latestSlots = payload.slots || [];
+            renderSlots(latestSlots);
 
-            data.forEach(slot => {
-                if (slot.charging) chargingCount++;
-                if (!slot.occupied && !slot.license_plate) availableCount++;
-                if (slot.license_plate) reservedCount++;
+            if (!selectedCurveSlotId) {
+                const chargingSlot = latestSlots.find(s => s.charging);
+                if (chargingSlot) selectedCurveSlotId = chargingSlot.id;
+            }
+            renderCurveChart();
 
-                let statusClass = slot.occupied ? 'status-occupied' : (slot.license_plate ? 'status-reserved' : 'status-free');
-                let statusText = slot.charging ? 'Charging' : (slot.occupied ? 'Occupied' : (slot.license_plate ? 'Reserved' : 'Available'));
-                let info = slot.license_plate ? `<div class="small text-primary mt-2"><b>${slot.license_plate}</b><br>${slot.start_time.split(' ')[1].slice(0,5)}-${slot.end_time.split(' ')[1].slice(0,5)}</div>` : '<small class="text-muted">Free</small>';
-                let btn = slot.license_plate && !slot.occupied ? `<button onclick="cancelReservation(${slot.id})" class="btn btn-sm btn-outline-danger mt-2 w-100">Cancel</button>` : '';
+            if (payload.policy) {
+                renderPolicyDetails(payload.policy);
+            }
+        }).catch(err => console.error("status fetch error:", err));
+    }
 
-                container.innerHTML += `
-                <div class="col-md-3 mb-4">
-                    <div class="card shadow slot-card ${statusClass} h-100">
-                        <div class="card-body text-center">
-                            <h6>Slot #${slot.id}</h6>
-                            <div class="my-2">${slot.charging ? '<i class="fas fa-bolt fa-2x charging-active"></i>' : '<i class="fas fa-plug fa-2x text-muted"></i>'}</div>
-                            <div class="fw-bold">${statusText}</div>
-                            ${info} ${btn}
-                        </div>
-                    </div>
-                </div>`;
-            });
+    function fetchKpi() {
+        fetch("/api/kpi").then(res => res.json()).then(data => {
+            document.getElementById("kpiCount").innerText = data.charging_count ?? 0;
+            document.getElementById("kpiDuration").innerText = data.avg_duration_minutes ?? 0;
+            document.getElementById("kpiUtil").innerText = `${data.utilization_24h_pct ?? 0}%`;
+            document.getElementById("kpiUtilLabel").innerText = `Utilization (${data.utilization_window || "06:00-24:00"})`;
+            document.getElementById("kpiWait").innerText = data.avg_wait_minutes ?? 0;
+            document.getElementById("kpiAvailable").innerText = data.available_slots ?? 0;
+            document.getElementById("kpiCharging").innerText = data.active_charging ?? 0;
+            document.getElementById("kpiQueue").innerText = data.queue_length ?? 0;
 
-            document.getElementById('stat-available').innerText = availableCount;
-            document.getElementById('stat-reserved').innerText = reservedCount;
-            document.getElementById('stat-charging').innerText = chargingCount;
+            if (data.policy) {
+                renderPolicyDetails(data.policy);
+            } else if (data.dynamic_soc_cap !== undefined || data.occupancy_ratio !== undefined) {
+                renderPolicyDetails({
+                    occupancy_ratio: data.occupancy_ratio ?? 0,
+                    recommended_cap: data.dynamic_soc_cap ?? 100,
+                    next_hour_predicted_flow: data.next_hour_predicted_flow ?? 0,
+                    reason: data.policy_reason || "normal_load",
+                    queue_ratio: 0,
+                    release_ratio: 0,
+                    calculation: {}
+                });
+            }
+
+            if (data.pricing) {
+                renderPricingDetails(data.pricing);
+            }
+        }).catch(err => console.error("kpi fetch error:", err));
+    }
+
+    function updateHourlyChart() {
+        fetch("/api/stats").then(res => res.json()).then(data => {
+            hourlyChart.data.datasets[0].data = data;
+            hourlyChart.update();
         });
     }
 
-    function updateChart() {
-        fetch('/api/stats').then(res => res.json()).then(data => {
-            chargingChart.data.datasets[0].data = data;
-            chargingChart.update();
-        });
+    function fetchHistory() {
+        const group = document.getElementById("historyGroupSelect").value;
+        fetch(`/api/history?group=${group}`).then(res => res.json()).then(data => {
+            historyChart.data.labels = data.labels || [];
+            const series = data.series || [];
+            historyChart.data.datasets[0].data = series.map(x => x.charging_count || 0);
+            historyChart.data.datasets[1].data = series.map(x => x.avg_duration_minutes || 0);
+            historyChart.data.datasets[2].data = series.map(x => x.utilization_pct || 0);
+            historyChart.data.datasets[3].data = series.map(x => x.avg_wait_minutes || 0);
+            historyChart.update();
+        }).catch(err => console.error("history fetch error:", err));
+    }
+
+    function fetchQueue() {
+        fetch("/api/queue").then(res => res.json()).then(data => {
+            const body = document.getElementById("queueTableBody");
+            const list = data.queue || [];
+            if (!list.length) {
+                body.innerHTML = '<tr><td colspan="8" class="text-muted">No queue records.</td></tr>';
+                return;
+            }
+            body.innerHTML = "";
+            list.forEach(item => {
+                const statusText = item.status === "waiting"
+                    ? '<span class="badge bg-warning text-dark">Waiting</span>'
+                    : '<span class="badge bg-success">Assigned</span>';
+                const prefText = item.request_charge_mode === "timed"
+                    ? `Timed ${item.request_charge_minutes || 30} min`
+                    : "Auto Stop";
+                body.innerHTML += `
+                    <tr>
+                        <td>${item.id}</td>
+                        <td>${item.plate}</td>
+                        <td>${statusText}</td>
+                        <td>${prefText}</td>
+                        <td>${item.estimated_wait_minutes ?? "--"} min</td>
+                        <td>#${item.assigned_slot_id ?? "--"}</td>
+                        <td>${item.actual_wait_minutes ?? "--"} min</td>
+                        <td class="tiny">${item.request_time || "--"}</td>
+                    </tr>`;
+            });
+        }).catch(err => console.error("queue fetch error:", err));
     }
 
     function fetchEnv() {
-        fetch('/api/env').then(res => res.json()).then(data => {
-            document.getElementById('tempDisplay').innerText = data.temp;
-            document.getElementById('humDisplay').innerText = data.hum;
-        }).catch(err => console.error("Env fetch error:", err));
+        fetch("/api/env").then(res => res.json()).then(data => {
+            document.getElementById("tempDisplay").innerText = data.temp;
+            document.getElementById("humDisplay").innerText = data.hum;
+            const t = Number(data.temp);
+            const h = Number(data.hum);
+            let label = "Live";
+            if (!Number.isNaN(t) && !Number.isNaN(h)) {
+                if (t >= 30 || h >= 80) {
+                    label = "Hot / Humid";
+                } else if (t < 10) {
+                    label = "Cold";
+                } else if (h < 35) {
+                    label = "Dry";
+                } else {
+                    label = "Comfort";
+                }
+            }
+            document.getElementById("envStatus").innerText = label;
+        }).catch(err => console.error("env fetch error:", err));
     }
-    // --- 新增: 从服务器拉取相册并渲染 ---
+
     function fetchSnapshots() {
-        // 在 URL 后面加上时间戳，强制浏览器每次都去后台拉取最新数据
-        fetch('/api/snapshots?t=' + new Date().getTime()).then(res => res.json()).then(data => {
-            const container = document.getElementById('snapshot-container');
-            container.innerHTML = ''; // 清空加载动画
-            
-            if(data.length === 0) {
+        fetch("/api/snapshots?t=" + new Date().getTime()).then(res => res.json()).then(data => {
+            const container = document.getElementById("snapshot-container");
+            container.innerHTML = "";
+            if (data.length === 0) {
                 container.innerHTML = '<p class="text-center text-muted my-4">No snapshots recorded yet.</p>';
                 return;
             }
-
-            // 循环生成图片卡片
             data.forEach(item => {
                 container.innerHTML += `
-                <div class="card bg-black border-secondary mb-4 shadow">
-                    <div class="card-header border-secondary text-light py-2 d-flex justify-content-between align-items-center">
-                        <span><i class="far fa-clock text-info"></i> ${item.time}</span>
-                        <span class="badge bg-secondary">Captured</span>
-                    </div>
-                    <div class="card-body p-0 text-center">
-                        <img src="${item.url}" class="img-fluid w-100" style="object-fit: contain; max-height: 300px;" loading="lazy" alt="Snapshot">
-                    </div>
-                </div>`;
+                    <div class="card bg-black border-secondary mb-3 shadow-sm">
+                        <div class="card-header border-secondary text-light py-2 d-flex justify-content-between">
+                            <span><i class="far fa-clock text-info"></i> ${item.time}</span>
+                            <span class="badge bg-secondary">Captured</span>
+                        </div>
+                        <div class="card-body p-0 text-center">
+                            <img src="${item.url}" class="img-fluid w-100" style="object-fit: contain; max-height: 280px;" loading="lazy" alt="Snapshot">
+                        </div>
+                    </div>`;
             });
-        }).catch(err => {
-            console.error("Snapshots fetch error:", err);
-            document.getElementById('snapshot-container').innerHTML = '<p class="text-danger text-center">Failed to load data.</p>';
+        }).catch(() => {
+            document.getElementById("snapshot-container").innerHTML = '<p class="text-danger text-center">Failed to load snapshots.</p>';
         });
     }
 
-    // --- 监听弹窗打开事件 ---
-    // 只有当用户点击了 "Live Snapshot" 按钮，弹窗即将显示时，才去触发拉取图片的请求！
-    var cameraModalEl = document.getElementById('cameraModal');
-    cameraModalEl.addEventListener('show.bs.modal', function (event) {
-        document.getElementById('snapshot-container').innerHTML = '<p class="text-center text-secondary my-4"><i class="fas fa-spinner fa-spin"></i> Loading snapshots...</p>';
+    const cameraModalEl = document.getElementById("cameraModal");
+    cameraModalEl.addEventListener("show.bs.modal", function () {
+        document.getElementById("snapshot-container").innerHTML = '<p class="text-center text-secondary my-4"><i class="fas fa-spinner fa-spin"></i> Loading snapshots...</p>';
         fetchSnapshots();
     });
 
-    // --- 抓拍图片刷新逻辑保持不变 ---
-    function refreshCamera() {
-        const cam = document.getElementById('cameraStream');
-        if(cam) {
-            cam.src = '/static/latest_frame.jpg?t=' + new Date().getTime();
-        }
-    }
-    setInterval(fetchStatus, 2000);
-    setInterval(updateChart, 10000);
-    setInterval(fetchEnv, 3000); 
-     
+    document.getElementById("historyGroupSelect").addEventListener("change", fetchHistory);
+
     fetchStatus();
-    updateChart();
+    fetchKpi();
+    fetchQueue();
+    updateHourlyChart();
+    fetchHistory();
     fetchEnv();
-    refreshCamera();
+
+    setInterval(fetchStatus, 2000);
+    setInterval(fetchKpi, 5000);
+    setInterval(fetchQueue, 5000);
+    setInterval(updateHourlyChart, 10000);
+    setInterval(fetchHistory, 60000);
+    setInterval(fetchEnv, 3000);
 </script>
 </body>
 </html>

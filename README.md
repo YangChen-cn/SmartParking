@@ -4,7 +4,11 @@
 
 ## 📋 项目概述 | Project Overview
 
-**SmartParking** 是一个现代化的智慧停车管理系统，适用于校园、商业中心等场景。该系统集成了以下核心功能：
+**SmartParking** 是一个现代化的智慧停车管理系统，适用于校园、商业中心等场景。系统覆盖“感知-调度-计费-可视化-仿真验证”完整闭环：前端实时展示，后端策略决策，硬件侧执行与回传，数据库进行历史沉淀与预测支撑。
+
+当前版本重点增强了充电调度与运营分析能力，包括动态SOC上限、动态电价、排队与等待指标、小时级流量预测，以及最近30天模拟分布导入能力，便于在论文或答辩阶段快速复现实验结果。
+
+该系统集成了以下核心功能：
 
 - 🅿️ **智能车位检测**：采用超声波传感器实时检测车位占用状态
 - 🔌 **EV充电管理**：完整的充电站管理和计费功能  
@@ -12,6 +16,14 @@
 - 🌡️ **环境监测**：实时温湿度显示和历史数据记录
 - 💻 **网页管理界面**：直观的实时监控和数据可视化
 - 📱 **REST API**：为未来的移动应用提供接口支持
+
+### 面向论文与实验的能力补充 | Research-oriented Additions
+
+- 📈 **策略仿真对比**：支持 baseline vs optimized 的关键指标对比（等待时长、P95、收益、利用率等）
+- 🧪 **可重复实验**：支持 `seed`、`days`、`demand-scale`、`price-elasticity` 参数化复现实验
+- 🗃️ **模拟数据入库**：支持将最近N天模拟充电时间段分布批量写入 `charging_sessions`
+- 🕒 **营业时段约束**：仿真与导入数据统一遵循营业窗口，避免非营业时段噪声
+- 🔁 **一键运行**：`import30.sh` 提供 dry-run 与正式导入两种模式
 
 ## 🏗️ 系统架构 | System Architecture
 
@@ -70,6 +82,7 @@
 SmartParking/
 ├── app.py                       # Flask主应用程序
 ├── parking.db                   # SQLite数据库
+├── import30.sh                  # 一键导入最近30天模拟充电分布（支持dry-run）
 ├── firmware/                    # ESP32固件代码
 │   ├── platformio.ini           # PlatformIO配置
 │   └── src/
@@ -80,9 +93,18 @@ SmartParking/
 │   └── index.html               # 网页管理界面
 ├── static/
 │   └── snapshots/               # 车牌抓拍相册
+├── scripts/
+│   ├── simulate_50_slots_compare.py         # baseline/optimized仿真对比
+│   └── import_simulated_distribution_30d.py # 导入最近N天模拟充电时间段分布到DB
 ├── .venv/                       # Python虚拟环境
 └── README.md                    # 本文件
 ```
+
+### Thesis Writing Reference (English)
+
+For architecture, parameter definitions, KPI definitions, and simulation formulas aligned with current code, see:
+
+- `docs/THESIS_MODEL_REFERENCE.md`
 
 ## 💾 数据库设计 | Database Schema
 
@@ -216,6 +238,41 @@ String serverBaseUrl = "http://your_server_ip:5001";
 
 打开浏览器访问：`http://localhost:5000/`
 
+### 5. 导入最近30天模拟充电时间段分布 | Import Simulated 30-day Distribution
+
+```bash
+# 在项目根目录执行（推荐）
+cd /Users/yang/Desktop/SmartParking
+
+# 预览分布（不写数据库）
+./import30.sh dry
+
+# 正式写入数据库（默认覆盖最近30天窗口）
+./import30.sh
+```
+
+常用参数（透传给导入脚本）：
+
+```bash
+# 指定拥堵级别和随机种子
+./import30.sh --demand-scale 3 --seed 20260321
+
+# 追加写入（不删除最近窗口）
+./import30.sh --append
+```
+
+如果不使用快捷脚本，也可以直接运行：
+
+```bash
+python3 scripts/import_simulated_distribution_30d.py --dry-run
+python3 scripts/import_simulated_distribution_30d.py
+```
+
+#### VS Code 一键运行建议
+
+- 打开 `Terminal`，在项目根目录执行 `./import30.sh dry` 或 `./import30.sh`。
+- 或直接打开 `scripts/import_simulated_distribution_30d.py`，点击右上角 `Run Python File`。
+
 ## 📡 API 文档 | API Documentation
 
 ### 获取车位状态
@@ -298,6 +355,16 @@ GET /api/env
 - 支持车位预约（start_time / end_time）
 - 自动超时取消（5分钟无车位变化）
 - 一车一密（password字段）
+
+### 6️⃣ 动态策略引擎
+- 基于占用率、队列长度、小时流量预测的动态SOC上限控制
+- 基于负载压力与峰谷时段的动态定价
+- 支持高负载分流与低负载吸引的弹性调度机制（仿真层）
+
+### 7️⃣ 仿真与数据导入工具
+- `scripts/simulate_50_slots_compare.py`：输出 baseline/optimized 对比报表（JSON/CSV）
+- `scripts/import_simulated_distribution_30d.py`：导入最近30天模拟充电分布到数据库
+- `import30.sh`：一键 dry-run/导入，便于在 VS Code 终端直接执行
 
 ## 📊 工作流程 | Workflow
 

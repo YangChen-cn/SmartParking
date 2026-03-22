@@ -14,7 +14,11 @@ Thumbs.db
 parking.db
 
 # 忽略所有抓拍的历史照片
-static/snapshots/*
+static/
 
 # 忽略所有日志文件
 logs/*
+
+# 忽略缓存文件
+__pycache__/
+scripts/__pycache__

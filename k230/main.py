@@ -217,7 +217,7 @@ if __name__=="__main__":
     sta.active(True)
     sta.connect(SSID, PASSWORD)
 
-    max_wait = 10
+    max_wait = 12
     while not sta.isconnected() and max_wait > 0:
         time.sleep(1)
         max_wait -= 1
