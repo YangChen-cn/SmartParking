@@ -21,28 +21,55 @@
         .env-card {
             border: none;
             border-radius: 14px;
-            color: #fff;
+            color: #132a44;
             background: linear-gradient(135deg, #0d6efd, #17a2b8);
             box-shadow: 0 8px 20px rgba(13, 110, 253, 0.25);
             position: relative;
             overflow: hidden;
         }
+        .env-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.88);
+            pointer-events: none;
+        }
         .env-card .card-body {
             position: relative;
-            z-index: 1;
+            z-index: 2;
         }
         .env-value {
             font-size: 1.7rem;
             font-weight: 700;
             line-height: 1;
+            color: #10263d;
+            position: relative;
+            z-index: 3;
+            background: rgba(255, 255, 255, 0.76);
+            border-radius: 8px;
+            display: inline-block;
+            padding: 2px 8px;
         }
-        .env-unit { font-size: 0.9rem; opacity: 0.9; }
+        .env-unit {
+            font-size: 0.9rem;
+            opacity: 1;
+            color: #1f3f5f;
+        }
+        .env-card h6,
+        .env-card .tiny {
+            color: #183653;
+            font-weight: 600;
+            opacity: 1;
+            position: relative;
+            z-index: 3;
+        }
         .env-badge {
             font-size: 0.75rem;
             letter-spacing: 0.02em;
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.35);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            color: #13314d;
             border-radius: 999px;
             padding: 4px 10px;
         }
@@ -51,18 +78,27 @@
             inset: 0;
             margin: 0;
             z-index: 0;
+            pointer-events: none;
         }
         .env-logo {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
+            object-position: center;
             filter: none;
-            opacity: 0.5;
+            opacity: 0.55;
         }
         @media (max-width: 768px) {
-            .env-logo {
-                object-fit: contain;
-                object-position: center;
+            .env-card::before {
+                background: rgba(255, 255, 255, 0.92);
+            }
+            .env-value,
+            .env-unit,
+            .env-card h6,
+            .env-card .tiny,
+            .env-badge {
+                text-shadow: none;
+                opacity: 1;
             }
         }
         .calc-panel {
@@ -318,10 +354,10 @@
                 </div>
                 <div class="card-body">
                     <div class="row g-2 mb-3">
-                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted">Charging Sessions</div><div class="kpi-num text-primary" id="kpiCount">0</div></div></div>
-                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted">Avg Duration (min)</div><div class="kpi-num text-success" id="kpiDuration">0</div></div></div>
-                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted" id="kpiUtilLabel">Utilization (06:00-24:00)</div><div class="kpi-num text-warning" id="kpiUtil">0%</div></div></div>
-                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted">Avg Wait (min)</div><div class="kpi-num text-danger" id="kpiWait">0</div></div></div>
+                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted">Charging Sessions<br>(Recent 30 days)</div><div class="kpi-num text-primary" id="kpiCount">0</div></div></div>
+                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted">Avg Duration (min)<br>(Recent 30 days)</div><div class="kpi-num text-success" id="kpiDuration">0</div></div></div>
+                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted" id="kpiUtilLabel">Utilization (06:00-24:00)<br>(Past 24h)</div><div class="kpi-num text-warning" id="kpiUtil">0%</div></div></div>
+                        <div class="col-6 col-md-3"><div class="kpi-box"><div class="tiny text-muted">Avg Wait (min)<br>(Recent 30 days)</div><div class="kpi-num text-danger" id="kpiWait">0</div></div></div>
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-4"><div class="kpi-box"><div class="tiny text-muted">Available Slots</div><div class="kpi-num" id="kpiAvailable">0</div></div></div>
@@ -1246,7 +1282,7 @@
             document.getElementById("kpiCount").innerText = data.charging_count ?? 0;
             document.getElementById("kpiDuration").innerText = data.avg_duration_minutes ?? 0;
             document.getElementById("kpiUtil").innerText = `${data.utilization_24h_pct ?? 0}%`;
-            document.getElementById("kpiUtilLabel").innerText = `Utilization (${data.utilization_window || "06:00-24:00"})`;
+            document.getElementById("kpiUtilLabel").innerHTML = `Utilization (${data.utilization_window || "06:00-24:00"})<br>(Past 24h)`;
             document.getElementById("kpiWait").innerText = data.avg_wait_minutes ?? 0;
             document.getElementById("kpiAvailable").innerText = data.available_slots ?? 0;
             document.getElementById("kpiCharging").innerText = data.active_charging ?? 0;

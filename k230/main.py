@@ -22,6 +22,58 @@ import socket
 # ============================================================================
 is_uploading = False
 
+WIFI_RETRY_INTERVAL = 10
+PLATE_STABLE_FRAMES = 3
+WIFI_MAX_RETRY_COUNT = 3
+
+
+def show_wifi_status(pl, text, color, size=40):
+    pl.osd_img.clear()
+    pl.osd_img.draw_string_advanced(120, 200, size, text, color=color)
+    pl.show_image()
+
+
+def connect_wifi(pl, sta, ssid, password, timeout_seconds=12):
+    print("[WIFI] Connecting to {} ...".format(ssid))
+    show_wifi_status(pl, "Connecting WiFi...", (255, 255, 0, 0))
+    sta.disconnect()
+    sta.connect(ssid, password)
+
+    wait_seconds = timeout_seconds
+    while not sta.isconnected() and wait_seconds > 0:
+        show_wifi_status(pl, "WiFi retrying... {}s".format(wait_seconds), (255, 255, 165, 0), 32)
+        time.sleep(1)
+        wait_seconds -= 1
+
+    if sta.isconnected():
+        print("[WIFI] Connected, IP: {}".format(sta.ifconfig()[0]))
+        show_wifi_status(pl, "WiFi Connected!", (255, 0, 255, 0), 32)
+        return True
+
+    print("[WIFI] Connect timeout")
+    show_wifi_status(pl, "WiFi Connect Failed!", (255, 255, 0, 0), 32)
+    return False
+
+
+def reconnect_wifi_if_needed(pl, sta, ssid, password, last_retry_time, retry_count, upload_enabled):
+    current_time = time.time()
+    if sta.isconnected():
+        return last_retry_time, 0, True
+
+    if retry_count >= WIFI_MAX_RETRY_COUNT:
+        if upload_enabled:
+            print("[WIFI] Max retry reached, disable image upload")
+            show_wifi_status(pl, "WiFi upload disabled", (255, 255, 0, 0), 32)
+        return last_retry_time, retry_count, False
+
+    if current_time - last_retry_time >= WIFI_RETRY_INTERVAL:
+        print("[WIFI] Disconnected, retrying...")
+        show_wifi_status(pl, "WiFi disconnected", (255, 255, 0, 0), 32)
+        connect_wifi(pl, sta, ssid, password)
+        return current_time, retry_count + 1, upload_enabled
+
+    return last_retry_time, retry_count, upload_enabled
+
 def upload_task(jpg_data, host, port):
     """后台异步上传任务 (使用原生 socket 实现 HTTP POST)"""
     global is_uploading
@@ -192,6 +244,15 @@ def is_valid_plate(plate_str):
         return False
     return True
 
+
+def update_stable_plate(stable_plate, stable_count, candidate_plate):
+    if candidate_plate == stable_plate:
+        stable_count += 1
+    else:
+        stable_plate = candidate_plate
+        stable_count = 1
+    return stable_plate, stable_count
+
 # ============================================================================
 #  主程序
 # ============================================================================
@@ -209,30 +270,17 @@ if __name__=="__main__":
     display_size = pl.get_display_size() # 得到 [800, 480]
 
     # --- 屏幕调试信息：WiFi 连接 ---
-    pl.osd_img.clear()
-    pl.osd_img.draw_string_advanced(200, 200, 40, "Connecting WiFi...", color=(255, 255, 0, 0))
-    pl.show_image()
-
     sta = network.WLAN(network.STA_IF)
     sta.active(True)
-    sta.connect(SSID, PASSWORD)
+    wifi_ready = connect_wifi(pl, sta, SSID, PASSWORD)
 
-    max_wait = 12
-    while not sta.isconnected() and max_wait > 0:
-        time.sleep(1)
-        max_wait -= 1
-
-    if sta.isconnected():
+    if wifi_ready:
         msg = "WiFi Connected! IP: " + sta.ifconfig()[0]
         print(msg)
-        pl.osd_img.clear()
-        pl.osd_img.draw_string_advanced(150, 200, 32, msg, color=(255, 0, 255, 0))
-        pl.show_image()
+        show_wifi_status(pl, msg, (255, 0, 255, 0), 32)
         time.sleep(3) # 持续显示3秒
     else:
-        pl.osd_img.clear()
-        pl.osd_img.draw_string_advanced(200, 200, 40, "WiFi Connect Failed!", color=(255, 255, 0, 0))
-        pl.show_image()
+        show_wifi_status(pl, "WiFi Connect Failed!", (255, 255, 0, 0), 32)
         time.sleep(2)
 
     # --- 硬件初始化 ---
@@ -250,9 +298,18 @@ if __name__=="__main__":
 
     sent_record = {}
     COOLDOWN_TIME = 30
+    stable_plate = ""
+    stable_plate_count = 0
+    last_wifi_retry_time = 0
+    wifi_retry_count = 0
+    upload_enabled = wifi_ready
 
     try:
         while True:
+            last_wifi_retry_time, wifi_retry_count, upload_enabled = reconnect_wifi_if_needed(
+                pl, sta, SSID, PASSWORD, last_wifi_retry_time, wifi_retry_count, upload_enabled
+            )
+
             img = pl.get_frame()
             det_res, rec_res = lr.run(img)
             lr.draw_result(pl, det_res, rec_res)
@@ -264,13 +321,19 @@ if __name__=="__main__":
                     plate_str = plate_str.strip()
                     if not is_valid_plate(plate_str): continue
 
-                    if (current_time - sent_record.get(plate_str, 0)) > COOLDOWN_TIME:
+                    stable_plate, stable_plate_count = update_stable_plate(stable_plate, stable_plate_count, plate_str)
+                    print("[PLATE] Candidate: {}, stable_count: {}".format(stable_plate, stable_plate_count))
+
+                    if stable_plate_count < PLATE_STABLE_FRAMES:
+                        continue
+
+                    if (current_time - sent_record.get(stable_plate, 0)) > COOLDOWN_TIME:
                         # 串口发送
-                        uart.write(plate_str + "\n")
-                        print("[UART SENT] {}".format(plate_str))
+                        uart.write(stable_plate + "\n")
+                        print("[UART SENT] {}".format(stable_plate))
 
                         # 异步上传逻辑
-                        if not is_uploading:
+                        if upload_enabled and not is_uploading:
                             is_uploading = True
                             try:
                                 c, h, w = img.shape[0], img.shape[1], img.shape[2]
@@ -285,7 +348,7 @@ if __name__=="__main__":
                                 print("Snap Error:", e)
                                 is_uploading = False
 
-                        sent_record[plate_str] = current_time
+                        sent_record[stable_plate] = current_time
             gc.collect()
     except Exception as e:
         print("Error:", e)

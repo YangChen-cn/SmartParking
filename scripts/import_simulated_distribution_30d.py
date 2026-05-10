@@ -78,7 +78,7 @@ def to_session_row(req, index: int, total_slots: int, peak_mult: float, offpeak_
 def main():
     parser = argparse.ArgumentParser(description="Import simulated charging distribution into charging_sessions")
     parser.add_argument("--days", type=int, default=30, help="Recent days to generate (default: 30)")
-    parser.add_argument("--slots", type=int, default=14, help="Slot count used for simulation scale (default: 14)")
+    parser.add_argument("--slots", type=int, default=4, help="Slot count used for simulation scale (default: 4)")
     parser.add_argument("--seed", type=int, default=20260321, help="Random seed for reproducibility")
     parser.add_argument("--demand-scale", type=float, default=2.0, help="Congestion level in [1,4]")
     parser.add_argument("--peak-mult", type=float, default=1.18, help="Peak-hour price multiplier")

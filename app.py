@@ -21,7 +21,7 @@ MANUAL_MINUTES_OPTIONS = {30, 60, 90, 120}
 SOC_CAP_TIERS = [100, 90, 80, 70, 60]
 PRICE_SMOOTHING_ALPHA = 0.35
 PRICE_STEP_CHANGE_LIMIT = 0.18
-PEAK_HOURS = {8, 9, 10, 12, 13, 17, 18, 19, 20}
+PEAK_HOURS = {8, 10, 12, 17, 18}
 OPERATING_START_HOUR = 6
 OPERATING_END_HOUR = 24
 OPERATING_HOUR_FLOW_FALLBACK = 0.10
@@ -985,14 +985,17 @@ def collect_kpi(conn):
     queue_len = cursor.fetchone()["c"]
     policy_context = build_policy_context(cursor, slots, current_time, queue_len)
 
-    # Total charging sessions
+    # Charging KPI window: recent 30 days only.
+    since_30d = fmt_dt(current_time - datetime.timedelta(days=30))
     cursor.execute(
         """
         SELECT COUNT(*) AS total_count,
                AVG(actual_minutes) AS avg_minutes,
                AVG(wait_minutes) AS avg_wait
         FROM charging_sessions
-        """
+        WHERE start_time >= ?
+        """,
+        (since_30d,),
     )
     row = cursor.fetchone()
     total_count = row["total_count"] or 0
@@ -1084,8 +1087,14 @@ def build_price_forecast(conn, hours=8):
     queue_len = int(cursor.fetchone()["c"] or 0)
 
     forecast = []
-    for offset in range(1, hours + 1):
+    max_scan_hours = 72
+    offset = 1
+    while len(forecast) < hours and offset <= max_scan_hours:
         t = current_time + datetime.timedelta(hours=offset)
+        if not is_operating_hour(t.hour):
+            offset += 1
+            continue
+
         current_flow = predict_hourly_flow(cursor, t, hour_offset=0)
         next_flow = predict_hourly_flow(cursor, t, hour_offset=1)
 
@@ -1114,11 +1123,12 @@ def build_price_forecast(conn, hours=8):
                 "forecast_flow": round(current_flow, 3),
             }
         )
+        offset += 1
 
     return {
         "generated_at": fmt_dt(current_time),
-        "hours": hours,
-        "basis": "Predicted from charging_sessions over the last 30 days (same-hour historical profile), weighted with current occupancy/queue.",
+        "hours": len(forecast),
+        "basis": "Predicted from charging_sessions over the last 30 days (same-hour historical profile), weighted with current occupancy/queue; non-operating hours are skipped.",
         "forecast": forecast,
     }
 

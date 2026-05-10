@@ -53,8 +53,6 @@ struct PlateMessage {
 QueueHandle_t xPlateQueue;
 
 // ================= 警告状态追踪 =================
-int alarmSlotId = -1;  // 记录哪个车位正在显示警告（-1表示无警告）
-int illegalOccupiedSlotId = -1;  // 记录哪个车位被非法占用（蜂鸣器持续响）
 
 // ================= 超声波检测参数优化 =================
 // 迟滞阈值（单位: cm）：占用判定 < DISTANCE_OCCUPIED，空闲判定 > DISTANCE_EMPTY
@@ -102,7 +100,6 @@ void TaskK230UART(void *pvParameters);
 void TaskPlateVerify(void *pvParameters);
 void TaskEnvMonitor(void *pvParameters); // 环境监测任务
 void TaskButtons(void *pvParameters); // 按键监测任务
-void TaskBuzzer(void *pvParameters); // 蜂鸣器任务
 
 void setup() {
   Serial.begin(115200);
@@ -186,8 +183,6 @@ xTaskCreatePinnedToCore(
   xTaskCreatePinnedToCore(TaskEnvMonitor, "EnvTask", 4096, NULL, 1, NULL, 1); 
   // 按键任务
   xTaskCreatePinnedToCore(TaskButtons, "ButtonTask", 4096, NULL, 2, NULL, 1); 
-  // 蜂鸣器任务
-  xTaskCreatePinnedToCore(TaskBuzzer, "BuzzerTask", 4096, NULL, 3, NULL, 0);
   
 }
 
@@ -412,19 +407,6 @@ void TaskSensors(void *pvParameters) {
         slots[i].lastReportedState = slots[i].isOccupied;
       }
       
-      // 检查是否需要清除警告状态（车位变空闲时回到主界面）
-      if (alarmSlotId == slots[i].id && slots[i].isOccupied == 0) {
-        showMainScreen();
-        alarmSlotId = -1;  // 清除警告标志
-      }
-      
-      // 如果该车位被非法占用，车位变空闲时停止蜂鸣
-      if (illegalOccupiedSlotId == slots[i].id && slots[i].isOccupied == 0) {
-        DEBUG_PRINTF("[Sensor] Illegal car left Slot %d. Stop buzzer.\n", slots[i].id);
-        illegalOccupiedSlotId = -1;  // 清除非法占用标志
-        showMainScreen();
-      }
-      
       vTaskDelay(pdMS_TO_TICKS(30));  
     }
     
@@ -614,17 +596,7 @@ void sendStatusToServer(int slot_id, int occupied, int charging) {
     int httpCode = http.GET();
     if(httpCode > 0) {
        String response = http.getString();
-       // 【核心逻辑】：解析后端传回的 ALARM 指令
-       if(response == "ALARM") {
-          DEBUG_PRINTF(">>> [ALARM] Slot %d 违停！开始持续蜂鸣。\n", slot_id);
-          
-          // 设置非法占用标志，TaskSensors will handle continuous buzzing
-          illegalOccupiedSlotId = slot_id;
-          
-          // 显示警告界面
-          safeOLEDPrintAlert("WARNING", "Slot " + String(slot_id) + " UNRESERVED", false);
-          alarmSlotId = slot_id;  // 记录警告界面所在的车位
-       }
+       (void)response;
     }
     http.end();
   }
@@ -649,18 +621,4 @@ float getDistance(int echoPin) {
   float distance = duration * 0.034 / 2;
   
   return distance;
-}
-
-void TaskBuzzer(void *pvParameters) {
-  while (1) {
-    if (illegalOccupiedSlotId != -1) {
-      digitalWrite(BUZZER_PIN, HIGH);
-      vTaskDelay(pdMS_TO_TICKS(100));
-      digitalWrite(BUZZER_PIN, LOW);
-      vTaskDelay(pdMS_TO_TICKS(100));
-    } else {
-      digitalWrite(BUZZER_PIN, LOW);
-      vTaskDelay(pdMS_TO_TICKS(50));  // 低优先级空闲
-    }
-  }
 }
